@@ -43,7 +43,7 @@ For each answer, make the corresponding change:
 
   ```text
   commit: <full sha of the aiDocs commit these files came from>
-  source: https://github.com/noskule/aiDocs
+  source: https://github.com/noskule-cc/aiDocs
   updated: YYYY-MM-DD
   ```
 
