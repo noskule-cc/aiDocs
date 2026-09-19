@@ -40,7 +40,7 @@ Before testing, build expected answers from the documentation:
 ```
 1. Read development.md → extract tech stack, architecture
 2. Read testing.md → extract test commands, structure
-3. Read coding-guidelines.md → extract workflow steps
+3. Read AGENTS.md → extract the pre-PR documentation contract
 4. Read DOCUMENTATION_GUIDELINES.md → extract documentation rules
 5. Read skills-and-agents.md → extract available skills and agents
 6. Read wiki index (if exists) → extract domain concepts

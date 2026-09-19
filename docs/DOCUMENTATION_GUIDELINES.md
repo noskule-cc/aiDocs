@@ -110,7 +110,7 @@ Documents platform-specific setup, development, and testing.
 
 - **UPPERCASE** — Fixed standard files, kept as-is in every project (e.g. `AGENTS.md`, `DOCUMENTATION_GUIDELINES.md`)
 - **lowercase** — Project-specific content files (e.g. `development.md`, `issue-tracker.md`)
-- **`*.template.md`** — Templates to copy and fill per project (e.g. `coding-guidelines.template.md`); the filled copy drops the `.template` suffix
+- **`*.template.md`** — Templates to copy and fill per project (e.g. `development.template.md`); the filled copy drops the `.template` suffix
 - **Skills and agents** live in `.claude/` with lowercase hyphenated names, registered in `skills-and-agents.md`
 
 The casing doubles as the update contract: `/update-aidocs` may overwrite UPPERCASE and `*.template.md` files (upstream-owned) but never lowercase project files.
@@ -224,4 +224,4 @@ Applies to both docs/ and wiki/.
 
 ---
 
-**Last Updated:** 2026-08-26
+**Last Updated:** 2026-09-19

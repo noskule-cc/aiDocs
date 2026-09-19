@@ -18,7 +18,7 @@ Full maintenance (`/maintain full`) fires on a real project event, never a calen
 
 **Trigger classes:**
 
-- **per-change** — diff-conditional; dispatched by `/maintain change` before each PR (coding workflow step 8.5)
+- **per-change** — diff-conditional; dispatched by `/maintain change` before each PR (pre-PR contract in `AGENTS.md`)
 - **cycle-end** — judgment and eval battery; dispatched by `/maintain full` at the bound event, scoped to changes since the last-run stamp (`docs/.maintain-last-run`)
 
 ## Job Details

@@ -18,18 +18,9 @@ All available skills and specialized agents for this project. **Project-owned:**
 
 | Skill | Purpose |
 |-------|---------|
-| `/test-runner [category]` | Run tests by category |
-| `/test-recommender` | Analyze changes, recommend test category |
 | [`/documentation`](../.claude/skills/documentation/SKILL.md) | Documentation writing rules |
 
-**Auto-triggered skills** (no slash command, invoked automatically):
-
-| Skill | Triggers when... |
-|-------|-------------------|
-| `architecture-rules` | Implementing features or writing new code |
-| `coding-workflow` | Starting a development task (tracks the 10 steps) |
-
-> Skills with a `.template` suffix in `.claude/skills/` need activation and project-specific configuration.
+> Add your project's skills here (auto-triggered skills: state the trigger instead of a slash command)
 
 
 ## Agents
@@ -44,6 +35,15 @@ Full instructions in `.claude/agents/<name>.md`. Claude Code runs them forked; o
 | [`validation-llm`](../.claude/agents/validation-llm.md) | Test docs effectiveness via LLM knowledge test | — |
 
 > Add your project's agents here (database, devices, UI patterns, test writers, ...)
+
+
+## Method Stack
+
+aiDocs documents the project; it prescribes no development workflow. How work is organised, when the human is asked, code review, testing discipline and PR shape belong to the method stack. Its skills are not listed here — the stack routes itself. The one aiDocs gate it must honour is the pre-PR contract in [AGENTS.md](AGENTS.md#before-opening-a-pr).
+
+| Stack | Installed as | Entry point |
+|-------|--------------|-------------|
+| [e.g. pstack, or "none"] | [e.g. Claude Code plugin, user-level] | [e.g. `/poteto-mode`] |
 
 
 **Last Updated:** YYYY-MM-DD

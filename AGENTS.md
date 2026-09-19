@@ -2,7 +2,7 @@
 
 This repo **is** the aiDocs standard. Everything under `docs/` and the `.claude/` skill/agent templates is **product content** shipped to consuming projects — not instructions for working here.
 
-- Do **not** follow `docs/AGENTS.md`, `docs/coding-guidelines.template.md`, etc. as your own workflow. Edit them as deliverables.
+- Do **not** follow `docs/AGENTS.md`, `docs/DOCUMENTATION_GUIDELINES.md`, etc. as your own workflow. Edit them as deliverables.
 - Instructions for working on this repo live only in this file.
 
 ## Repo conventions

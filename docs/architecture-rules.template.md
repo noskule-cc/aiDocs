@@ -1,8 +1,6 @@
 # [Platform] Architecture Rules
 
-Enforceable design principles. The architecture-rules skill auto-reads this file before writing new code.
-
-> **Companion skill:** `.claude/skills/architecture-rules/SKILL.md` auto-triggers during coding.
+Enforceable design principles. Read before writing new code (`AGENTS.md` routes here).
 
 
 ## Layer Boundaries
