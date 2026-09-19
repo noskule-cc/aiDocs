@@ -83,6 +83,17 @@ flowchart TD
 Green outline = always read | Yellow dashed = read if exists | Blue outline = read when situation occurs
 
 
+## Before Opening a PR
+
+Whatever workflow or method stack drives the task, these must be true before a PR opens:
+
+- **Discoveries captured** — reusable technical knowledge from the session (API quirks, workarounds, how external systems actually behave) is on the wiki
+- **Docs updated** — `changelog.md`, plus docs and wiki per [DOCUMENTATION_GUIDELINES.md](DOCUMENTATION_GUIDELINES.md), with the Information Minimalism test applied
+- **Maintenance run** — `/maintain change` ran on the branch diff and its findings are fixed (registry: [tools/jobs.md](tools/jobs.md))
+
+This contract states outcomes only. How the work is organised, reviewed, tested, and how the PR is shaped belongs to the workflow in use.
+
+
 ## Skills and Sub-Agents
 
 Two kinds of specialized instructions:
@@ -95,4 +106,4 @@ Two kinds of specialized instructions:
 > **Setup:** See [CREATING_AGENTS.md](CREATING_AGENTS.md) for how to create and register skills and agents.
 
 
-**Last Updated:** 2026-08-26
+**Last Updated:** 2026-09-19

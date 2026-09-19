@@ -7,6 +7,7 @@ Routing table for triage. Bug reports speak feature language ("scanning hangs wh
 - One row per user-facing feature. Skip features whose location is obvious from structure or naming (minimalism Q2, applied per row).
 - **No file inventories** — they rot fast and duplicate grep. Agents trace from the entry point.
 - Behavior and rationale live on the wiki feature page — link, never restate.
+- How to launch and drive a feature lives in the project's verification skill (`.claude/skills/verify-*/`), if one exists — link, never restate. Gotchas here stay code-level: invariants and symptom hints.
 - Entry points must be grep-able identifiers; `check-docs.py` fails CI when one no longer resolves in the source tree.
 
 ## Features
