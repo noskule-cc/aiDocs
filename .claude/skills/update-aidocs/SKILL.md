@@ -15,7 +15,7 @@ Every shipped file classifies into exactly one of:
 | Class | Files | On update |
 |-------|-------|-----------|
 | **Upstream-owned** | UPPERCASE `.md` in `docs/` (incl. `README.md`), `*.template.md` / `*.template`, upstream-shipped files under `.claude/` | apply changes |
-| **Project-owned** | Filled template copies (`coding-guidelines.md`, `issue-tracker.md`, `wiki.md`, `skills-and-agents.md`, `tools/jobs.md`, ...), `docs/project-index.md`, project's own docs/skills/agents, `docs/.aidocs-version` | never touch |
+| **Project-owned** | Filled template copies (`issue-tracker.md`, `wiki.md`, `skills-and-agents.md`, `tools/jobs.md`, ...), `docs/project-index.md`, project's own docs/skills/agents, `docs/.aidocs-version` | never touch |
 
 **Shipped-active skills** (e.g. `documentation`, `validate-docs`) are upstream-owned, but projects may customize them (platform wording, extra rules). That's allowed — the 3-way check below turns upstream changes to a customized skill into a conflict for manual merge instead of an overwrite.
 
@@ -40,11 +40,12 @@ Every shipped file classifies into exactly one of:
 
 3. **Fetch upstream** — clone the source into a temp dir (full history, needed for diffs and the probe). Old ref = stamp commit; new ref = `$ARGUMENTS` or upstream main HEAD.
 
-4. **Apply the migration map first** (pre-2026-08 adopters). These upstream renames must be treated as lineage, not delete+add:
+4. **Apply the migration map first.** These upstream renames and retirements must be treated as lineage, not as a plain delete+add:
 
    | Legacy name in project | Becomes |
    |------------------------|---------|
-   | `docs/CODING_GUIDELINES.md` | rename to `docs/coding-guidelines.md` — it IS the filled copy (project-owned); template added alongside |
+   | `docs/CODING_GUIDELINES.md`, `docs/coding-guidelines.md` | retired 2026-09 — aiDocs no longer ships a development workflow (owned by the project's method stack). First port anything project-specific that is not workflow (e.g. data-persistence rules → `development.md`); the documentation steps now live in `docs/AGENTS.md` (Before Opening a PR). Then propose deletion — confirm with user |
+   | activated `.claude/skills/coding-workflow/`, `architecture-rules/`, `test-runner/`, `test-recommender/` (and their `SKILL.md.template` sources) | retired 2026-09 with the workflow. Port the test commands and the source-path→category mapping into `testing.md` first; `architecture-rules.md` itself stays. Then propose deletion and remove their rows from `skills-and-agents.md` — confirm with user. Keep any the project wants as its own: they become project-owned |
    | `docs/SUBAGENTS.md` | replaced by `docs/CREATING_AGENTS.md` |
    | `docs/subagents/VALIDATION.md` + `.claude/agents/validation.md` | split into `.claude/agents/validation-docs.md` + `validation-llm.md` (full-bodied) |
    | `docs/tools/JOBS.md` | rename to `docs/tools/jobs.md` — filled copy; template added alongside |
