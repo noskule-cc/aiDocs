@@ -23,7 +23,7 @@ Read these **when you reach that situation**, not upfront:
 |-------------------------|-------------------------------|
 | Finding platform docs   | `INDEX.md`                   |
 | Setting up / installing | `installation.md`            |
-| Writing code            | `architecture-rules.md`, `development.md` |
+| Writing code / changing a system | `architecture-rules.md`, `development.md` |
 | Triaging a bug / locating a feature | `feature-map.md` (if it exists) |
 | Writing tests           | `testing.md`                 |
 | Writing documentation   | `DOCUMENTATION_GUIDELINES.md` |
@@ -52,7 +52,7 @@ flowchart TD
 
     M3 --> SIT{{"What situation?"}}
 
-    SIT -->|"Writing code"| CODE["architecture-rules.md<br>development.md"]
+    SIT -->|"Writing code / changing a system"| CODE["architecture-rules.md<br>development.md"]
     SIT -->|"Triaging a bug"| TRIAGE["feature-map.md"]
     SIT -->|"Writing tests"| TEST["testing.md"]
     SIT -->|"Writing docs"| DOCS["DOCUMENTATION_GUIDELINES.md<br>INFORMATION_MINIMALISM.md"]
