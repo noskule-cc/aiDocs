@@ -2,7 +2,7 @@
 
 **MUST read [docs/AGENTS.md](docs/AGENTS.md) before starting any task.**
 
-It contains navigation, situational references, and workflow requirements.
+It contains navigation, situational references, and the pre-PR documentation contract.
 
 <!-- Root AGENTS.md per the agents.md spec — read natively by Codex, Cursor,
      Gemini CLI and other AI tools. Rename this template to AGENTS.md. -->
