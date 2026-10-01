@@ -2,6 +2,7 @@
 name: issue-writer
 description: Creates GitHub issues with correct type, labels, project fields, and structure
 tools: Read, Grep, Glob, Bash
+model: sonnet
 ---
 
 # issue-writer
