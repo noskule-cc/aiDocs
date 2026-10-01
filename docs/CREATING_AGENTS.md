@@ -32,6 +32,7 @@ Each `.claude/agents/<name>.md` carries YAML frontmatter plus its complete instr
 name: agent-name
 description: One line — when to invoke this agent
 tools: Read, Grep, Glob
+model: sonnet
 ---
 
 # agent-name
@@ -50,6 +51,19 @@ One-line description.
 ```
 
 Omit a section only when it genuinely doesn't apply.
+
+### Choosing a model
+
+`model` picks what the agent runs on. Not every task needs the most capable model; match the model to what the task demands and what a wrong answer costs:
+
+| Model | Use for | Examples |
+|-------|---------|----------|
+| `fable` | Deep reasoning where a mistake is expensive or hard to see | architecture analysis that drives a design, schema migrations and data integrity, anything that touches real user data |
+| `opus` | Complex features, debugging, refactoring; code with subtle domain logic | feature builders, test writers, device and platform specialists |
+| `sonnet` | Pattern matching and consistency: reviews, audits, conventions, filing | documentation validation, issue filing, board updates, the "fresh agent" in a documentation quiz |
+| `haiku` | Simple, repetitive, well-specified operations | commit messages, branch creation, mechanical renames |
+
+Omit the field to inherit the calling session's model. Review the choice when the agent's scope changes.
 
 
 ## Creating a New Skill or Agent

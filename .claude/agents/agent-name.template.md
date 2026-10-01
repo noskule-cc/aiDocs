@@ -2,6 +2,7 @@
 name: agent-name
 description: One-line description of when to invoke this agent
 tools: Read, Grep, Glob
+model: sonnet
 ---
 
 # agent-name

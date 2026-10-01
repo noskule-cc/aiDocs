@@ -2,6 +2,7 @@
 name: code-analysis
 description: Interprets the code-index analysis report and recommends structural improvements
 tools: Read, Grep, Glob, Bash
+model: opus
 ---
 
 # code-analysis

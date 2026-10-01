@@ -2,6 +2,7 @@
 name: validation-llm
 description: Tests documentation effectiveness by quizzing a fresh LLM agent
 tools: Read, Grep, Glob, Bash
+model: sonnet
 ---
 
 # validation-llm

@@ -2,6 +2,7 @@
 name: validation-docs
 description: Validates documentation structure and consistency across docs/ and wiki/
 tools: Read, Grep, Glob
+model: sonnet
 ---
 
 # validation-docs
