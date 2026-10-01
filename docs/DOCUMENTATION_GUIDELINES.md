@@ -133,42 +133,50 @@ devices-ble-polar.md
 **Before writing:** Check wiki index to avoid duplication
 **After writing:** Update the sidebar
 
-#### Structure: Behavior First, Then Platform
+#### Structure: Behavior, Rationale, Components
 
-Wiki pages separate **what the feature does** (platform-agnostic) from **how it's implemented** (platform-specific):
+A wiki page describes the feature for **any** platform. Per-platform sections (`## Android Implementation`, `## iOS Implementation`), class names and OS API names do not belong on it: they are obvious from the code, go stale with every refactor, and tie the page to one port. A platform quirk that changes the behaviour goes inline, marked `PLATFORM:`; file and class maps are the code index's job.
+
+Sections in this order; drop a section when it would be empty:
+
+| Section | Holds |
+|---------|-------|
+| `## What It Does` | The behaviour from the user's perspective: what starts it, what the user sees, what ends it |
+| `## Why It Matters` | The decisions and their rationale with the decisive numbers; the alternatives that were rejected and why |
+| `## How It Works` | The mechanism: phases, rules, limits, each limit with the reason for its value. Diagram the parts that are hard to hold in the head (see [Diagrams](#diagrams)) |
+| `## On Screen`, `## After the Session` | What the user sees live and afterwards (feature pages) |
+| `## Caveats` | Known limits, linking to the evidence instead of restating it |
+| `## Open Questions` | One line per open issue that can still change the design, linked |
+| `## Implementation` | The components as **roles**, not classes: a flow diagram of roles and data, and a table *role → what only it knows*. Tuning constants by meaning ("stage bounds 160–240 s"), not by identifier. Link the test lane |
+| `## Related Documentation` | Links |
+
+A page states **current** behaviour. How the feature used to work belongs in the changelog and the issues; keep one sentence on why a decision changed, with a link.
 
 ```markdown
-# Device Connection Management
+# Device Connection
 
 ## What It Does
-Users pair heart rate devices once. The app remembers paired devices and
-reconnects automatically on launch. Manual disconnect prevents auto-reconnect
-until user explicitly reconnects.
+Users pair a heart rate device once. The app reconnects on launch; a manual
+disconnect holds until the user reconnects.
 
-Connection states: Disconnected → Connecting → Connected → Disconnected
+Disconnected → Connecting → Connected → Disconnected
 
 ## Why It Matters
 - Auto-reconnect saves time for daily workouts
-- Respecting manual disconnect prevents unwanted battery drain
-- Clear states let UI show accurate feedback
+- Respecting a manual disconnect prevents battery drain
 
-## Android Implementation
+## How It Works
+The reconnect rules, with a state diagram once the lifecycle has more than
+three states.
 
-### Key Components
-| Component | Responsibility |
-|-----------|---------------|
-| `DeviceManager` | Coordinates BLE and WearOS sources |
-| `BleDeviceSource` | Android BLE scanning and GATT connections |
-
-### Quirks
-- BLE scanning requires location permission (Android platform requirement)
-- Some devices (Coospo) need post-connect delay before notifications work
-
-## iOS Implementation
-*To be documented when iOS development begins.*
+## Implementation
+| Role | What only it knows |
+|------|--------------------|
+| Device manager | Which source is active and the reconnect policy |
+| Device source, one per protocol | PLATFORM: BLE scanning needs the location permission on Android; some straps need a post-connect delay before notifications |
 ```
 
-If someone reads only "What It Does" and "Why It Matters", they have everything needed to implement the feature on any platform.
+Whoever reads the page can implement the feature on any platform; nothing on it has to be translated first.
 
 ## Diagrams
 

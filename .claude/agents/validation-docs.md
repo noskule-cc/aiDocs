@@ -60,10 +60,12 @@ For each doc, judge whether the content still matches reality:
 
 For each wiki page (except Home, README, _Sidebar):
 
-1. Check for "## What It Does" section near top
-2. Check for "## Why It Matters" section
-3. Platform implementation sections present where platform content exists
-4. Grep for `INTENT:` or `PLATFORM:` in headings — should not exist
+1. "## What It Does" near the top and "## Why It Matters" present
+2. No per-platform sections (`## Android Implementation`, `## iOS Implementation`) and no class or OS API names in the behaviour sections; an `## Implementation` section, where present, describes roles with a *role → what only it knows* table
+3. A lifecycle with more than three states, a decision loop or a data flow across more than two roles carries a diagram; Mermaid uses strokes only (no `fill` / `color`)
+4. No narrative of how the feature used to work beyond one linked sentence
+5. Numbers and limits carry a reason; evidence stated on one page and linked from the others, not repeated
+6. Grep for `INTENT:` in headings — should not exist; `PLATFORM:` appears only inline, never as a heading
 
 ### Step 6: File Length and Focus
 
