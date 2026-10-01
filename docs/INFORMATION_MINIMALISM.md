@@ -35,6 +35,10 @@ Before adding any documentation, ask these 3 questions in order:
 | Git commit command syntax                | NO        | -            | -              | ❌ Don't document  |
 | Architecture decision (Arc42)            | YES       | NO           | NO             | ✅ Document        |
 | File naming pattern already in README    | YES       | -            | YES            | 🔗 Reference       |
+| Component roles + data-flow diagram      | YES       | NO           | NO             | ✅ Document        |
+| Class table on a wiki feature page       | YES       | YES (code)   | -              | ❌ Roles instead   |
+| Per-OS sections on a wiki page           | NO        | -            | -              | ❌ PLATFORM: inline |
+| How a feature used to work               | NO        | -            | YES (changelog)| 🔗 Reference       |
 
 
 ## When to Document
@@ -47,6 +51,7 @@ Before adding any documentation, ask these 3 questions in order:
 - Design patterns unique to your project
 - Trade-offs and alternatives considered
 - Tribal knowledge a skilled developer would need
+- Diagrams for lifecycles, decision loops and data flows that prose makes hard to hold
 
 **Don't document:**
 
@@ -54,6 +59,8 @@ Before adding any documentation, ask these 3 questions in order:
 - Information already in structure/naming
 - Details any experienced engineer would know
 - Duplicate content (reference instead)
+- Platform class and API names on wiki pages (describe roles; mark a quirk `PLATFORM:` inline)
+- How a feature used to work (the changelog and the issues hold history)
 
 
 ## Underlying Principle
