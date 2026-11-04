@@ -54,6 +54,7 @@ Every shipped file classifies into exactly one of:
    | `docs/subagents/README.md` | replaced by `docs/CREATING_AGENTS.md` |
    | root `CODEX.md` | superseded by root `AGENTS.md` (agents.md spec — read natively by Codex, Cursor and others) |
    | `docs/tools/jobs.md` without trigger classes (pre-2026-08 format) | rebuild in the trigger-class format from `docs/tools/jobs.template.md` (per-change / cycle-end column, Cycle-End Binding), preserving the project's own jobs — confirm with user. Not a mere drift notice: `/maintain` cannot dispatch without this format |
+   | `.claude/agents/agent-name.template.md` | rename to `.claude/agents/agent-name.md.template` — the `.md` ending made Claude Code load the blueprint as a live agent |
    | filled `docs/README.md` (project-identity page) | replaced by the fixed standard `README.md` (generic orientation routing) — identity lives in the root README, wiki location in `wiki.md`; port anything unique to those homes first, confirm with user |
 
 5. **Compute the delta** — `git diff --name-status <old>..<new>` in the clone. Classify each path by the ownership contract.

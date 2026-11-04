@@ -15,6 +15,7 @@ Full maintenance (`/maintain full`) fires on a real project event, never a calen
 | [Check docs (mechanical)](#check-docs) | `python docs/tools/check-docs.py` | per-change | any doc or feature-map change (also runs in CI) |
 | [Validate docs (judgment)](#validate-docs) | Invoke `validation-docs` agent | cycle-end | docs/ or wiki changed since last run |
 | [Triage evals](#triage-evals) | Invoke `validation-llm` agent (Triage Eval Mode) | cycle-end | feature-map, evals, or routing docs changed since last run |
+| [Verification map](#verification-map) | `/maintain-verification-skill` (method stack) | cycle-end | only if the project has a verification skill: app UI or the skill changed since last run |
 
 **Trigger classes:**
 
@@ -44,3 +45,11 @@ Routing-effectiveness test: bug-report-phrased questions from `evals.md` run aga
 
 1. Invoke the `validation-llm` agent — Triage Eval Mode runs when `tools/evals.md` exists
 2. Output: hit-rate report per mode, misses diagnosed with navigation traces
+
+### Verification map
+
+Optional, for projects whose method stack generated a verification skill (pstack's `/create-verification-skill`). Keeps its feature map true to the app: source readers per feature, one live pass that drives every feature, at most one PR of proven corrections. Product defects it finds become issues, never doc edits. Delete this row and section when the project has no verification skill.
+
+1. Invoke `/maintain-verification-skill`
+2. Output: outcome `clean`, `changed` (one PR) or `blocked`, with coverage and product defects
+

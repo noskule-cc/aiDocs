@@ -89,7 +89,7 @@ Mechanical checks run as a script, judgment stays with agents:
 ```
 .claude/
 ├── agents/                             # Full agent instructions (auto-discovered by Claude Code,
-│   ├── agent-name.template.md          #   readable by any AI tool via the registry)
+│   ├── agent-name.md.template          #   readable by any AI tool via the registry)
 │   ├── code-analysis.md
 │   ├── issue-writer.md
 │   ├── validation-docs.md

@@ -25,7 +25,7 @@ Full instructions live **in the skill or agent file itself** — never split "tr
 
 ## Agent File Format
 
-Each `.claude/agents/<name>.md` carries YAML frontmatter plus its complete instructions (see `agent-name.template.md` for the blueprint):
+Each `.claude/agents/<name>.md` carries YAML frontmatter plus its complete instructions (see `agent-name.md.template` for the blueprint; the `.md.template` ending keeps Claude Code from loading it as an agent):
 
 ```markdown
 ---
@@ -69,7 +69,7 @@ Omit the field to inherit the calling session's model. Review the choice when th
 ## Creating a New Skill or Agent
 
 1. Identify a repeatable task area (skip one-offs and things an existing skill/agent covers)
-2. Create the file: `.claude/skills/<name>/SKILL.md` or `.claude/agents/<name>.md` (copy `agent-name.template.md`)
+2. Create the file: `.claude/skills/<name>/SKILL.md` or `.claude/agents/<name>.md` (copy `agent-name.md.template` and drop the `.template` ending)
 3. Register it in `docs/skills-and-agents.md` (purpose, trigger, companion skill if any)
 4. Test it on a real task
 
