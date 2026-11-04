@@ -60,11 +60,11 @@ Generate questions across these categories:
 - "Where are test commands documented?"
 - "What sub-agents are available?"
 
-**Workflow (does it understand the process?):**
+**Process (does it know the gates this project sets?):**
 
-- "What steps do you follow when starting a new task?"
-- "When should you ask the user before proceeding?"
-- "How do you create a pull request?"
+- "What must be true before a PR opens?"
+- "How do you prove a change works in the running app?"
+- "Where does a reusable technical discovery go?"
 
 **Documentation (does it know the rules?):**
 

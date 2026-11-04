@@ -24,7 +24,7 @@ Ask in this order (skip what preflight already answered):
 5. **Issue tracking** — GitHub Issues with Projects v2 board, plain issues, or none
 6. **Testing** — test categories, commands, and which source paths map to which category (feeds `testing.md`)
 7. **Feature map** — is the codebase organized by feature folders (feature→code mapping obvious from structure → decline) or by layers (instantiate `feature-map`, see `docs/feature-map.template.md`)?
-8. **Method stack** — which workflow/method stack drives development (e.g. the pstack plugin), or none? aiDocs ships no development workflow; the answer fills the Method Stack table in `skills-and-agents.md`
+8. **Method stack** — which workflow/method stack drives development (e.g. the pstack plugin), or none? aiDocs ships no development workflow; the answer fills the Method Stack table in `skills-and-agents.md`. When the stack generates per-project artifacts, recommend them in the closing report rather than running them: for pstack, `/create-verification-skill` when the project has something a user drives (app, CLI, service), and `/create-formal-verification-skill` where concurrency, state machines or parsers carry the risk. Record each one that gets generated under the Method Stack table
 9. **Cycle-end event** — which real event triggers full maintenance (`/maintain full`): sprint end, milestone close, or pre-release? (fills the Cycle-End Binding in `tools/jobs.md`)
 
 ## Step 2 — Apply
