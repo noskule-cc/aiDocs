@@ -16,7 +16,7 @@ Types, labels, and project fields are discoverable via the GitHub API. These rul
 8. **Title format** — imperative verb + concise description
 9. **Update wiki** when closing issues that add significant functionality
 10. **Epic estimate** — sum of its sub-issue estimates
-11. **Sign as an agent** — if you are an AI agent, always add your name at the bottom of any issue you create or comment you post (e.g. a final `*Filed by <agent/model name> (AI agent)*` line), so automated authorship is explicit
+11. **Sign as an agent** — if you are an AI agent, put your signature on the **first line** of every issue body, issue or PR comment and PR body you draft: `` — 🤖 <model name> (`<model ID>`) ``, with your actual model name and exact model ID. The posting account no longer tells who wrote it; humans never sign
 
 ### Estimate Scale
 
