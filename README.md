@@ -73,7 +73,7 @@ Read indexes upfront, read content only when you reach that situation. Documenta
 
 ### Jobs Registry
 
-A central registry of runnable tasks — validation, documentation checks, evals — with a trigger class per job (**per-change** or **cycle-end**). The `/maintain` skill dispatches from the registry: `change` runs diff-scoped checks before each PR, `full` runs the judgment/eval battery at the project's cycle-end event (sprint end, milestone close, or pre-release), incrementally scoped to what changed since the last run. LLMs check [tools/jobs.md](docs/tools/jobs.template.md) to discover what's available.
+A central registry of runnable tasks — validation, documentation checks, evals — with a trigger class per job (**per-change** or **cycle-end**). The `/maintain` skill dispatches from the registry: `change` runs diff-scoped checks before each PR, `full` runs the judgment/eval battery at the project's cycle-end event (Focus close, milestone close, or pre-release), incrementally scoped to what changed since the last run. LLMs check [tools/jobs.md](docs/tools/jobs.template.md) to discover what's available.
 
 ### Validation
 

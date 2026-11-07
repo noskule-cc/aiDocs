@@ -6,7 +6,7 @@ Runnable tasks for validation. This is the central registry — check here to se
 
 Full maintenance (`/maintain full`) fires on a real project event, never a calendar date:
 
-- **Cycle-end event:** [sprint end | milestone close | pre-release]
+- **Cycle-end event:** [Focus close (see `issue-tracker.md`) | release milestone close | pre-release]
 
 ## Available Jobs
 
@@ -15,6 +15,7 @@ Full maintenance (`/maintain full`) fires on a real project event, never a calen
 | [Check docs (mechanical)](#check-docs) | `python docs/tools/check-docs.py` | per-change | any doc or feature-map change (also runs in CI) |
 | [Validate docs (judgment)](#validate-docs) | Invoke `validation-docs` agent | cycle-end | docs/ or wiki changed since last run |
 | [Triage evals](#triage-evals) | Invoke `validation-llm` agent (Triage Eval Mode) | cycle-end | feature-map, evals, or routing docs changed since last run |
+| [Check tracker](#check-tracker) | `python docs/tools/tracker.py check --project <owner>/<number>` | cycle-end | only with a Projects v2 board; always runs (the board changes outside git) |
 | [Verification map](#verification-map) | `/maintain-verification-skill` (method stack) | cycle-end | only if the project has a verification skill: app UI or the skill changed since last run |
 
 **Trigger classes:**
@@ -45,6 +46,13 @@ Routing-effectiveness test: bug-report-phrased questions from `evals.md` run aga
 
 1. Invoke the `validation-llm` agent — Triage Eval Mode runs when `tools/evals.md` exists
 2. Output: hit-rate report per mode, misses diagnosed with navigation traces
+
+### Check tracker
+
+Board rules from `issue-tracker.md` that a script can verify: closed but not Done, open but off the board, Test without a `## Manual test` section, more than one open Focus, Ready but blocked, issues without an epic. Delete this row and section when the project has no board.
+
+1. Run `python docs/tools/tracker.py check --project <owner>/<number>` (needs a logged-in `gh`)
+2. Exit code non-zero on errors; fix each on the board, warnings are judgment calls
 
 ### Verification map
 
