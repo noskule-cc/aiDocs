@@ -3,8 +3,8 @@
 
 One query of the GitHub Projects v2 board, three views of it:
 
-  status   what the current Focus holds, what can be picked up next, what
-           waits on the owner, which manual tests are owed
+  status   what waits on the owner (by Owner action), what the current Focus
+           holds, what can be picked up next
   check    board rules a script can verify; exit 1 on errors
   roadmap  Mermaid graph of open epics and issues linked by "blocked by"
 
@@ -26,12 +26,14 @@ STATUSES = ["Backlog", "Refine", "Ready", "In Progress", "Waiting on owner",
             "Review", "Test", "Done"]
 EPIC_TYPE = "Epic"
 BUG_TYPE = "Bug"
+OWNER_FIELD = "Owner action"
+DECIDE = "Decide"  # the Owner action that pairs with "Waiting on owner"
 MANUAL_TEST_HEADING = "## manual test"
 
 ITEM_FIELDS = """
   status: fieldValueByName(name: "Status") {
     ... on ProjectV2ItemFieldSingleSelectValue { name } }
-  testKind: fieldValueByName(name: "Test kind") {
+  ownerAction: fieldValueByName(name: "Owner action") {
     ... on ProjectV2ItemFieldSingleSelectValue { name } }
   priority: fieldValueByName(name: "Priority") {
     ... on ProjectV2ItemFieldSingleSelectValue { name } }
@@ -130,7 +132,7 @@ def load_board(project, repo):
                 "url": issue["url"],
                 "open": issue["state"] == "OPEN",
                 "status": single(node.get("status")),
-                "test_kind": single(node.get("testKind")),
+                "owner_action": single(node.get("ownerAction")),
                 "priority": single(node.get("priority")),
                 "type": (issue.get("issueType") or {}).get("name"),
                 "parent": (issue.get("parent") or {}).get("number"),
@@ -179,8 +181,23 @@ def by_priority(items):
 
 
 def cmd_status(fields, items, milestones, off_board):
+    def section(title, rows, indent=""):
+        print(f"\n{indent}{title} ({len(rows)})")
+        for row in rows:
+            print(indent + line(row))
+
+    owed = [i for i in items if i["owner_action"]
+            or i["status"] == "Waiting on owner" or (i["status"] == "Test")]
+    actions = sorted({i["owner_action"] or "no Owner action" for i in owed},
+                     key=lambda a: (a != DECIDE, a == "no Owner action", a))
+    print(f"Waiting for the owner ({len(owed)})")
+    for action in actions:
+        section(action, by_priority([i for i in owed
+                                     if (i["owner_action"] or "no Owner action") == action]), " ")
+
     open_items = [i for i in items if i["open"] and i["type"] != EPIC_TYPE]
     focus = milestones[0] if len(milestones) == 1 else None
+    print()
     if focus:
         print(f"Focus: {focus['title']}  ({focus['openIssues']['totalCount']} open)  {focus['url']}")
         if focus["description"]:
@@ -189,12 +206,6 @@ def cmd_status(fields, items, milestones, off_board):
         print("Focus: ambiguous, open milestones: " + ", ".join(m["title"] for m in milestones))
     else:
         print("Focus: none open")
-
-    def section(title, rows):
-        print(f"\n{title} ({len(rows)})")
-        for row in rows:
-            print(line(row))
-
     in_focus = [i for i in open_items if focus and i["milestone"] == focus["title"]]
     for status in ["In Progress", "Review", "Ready", "Refine"]:
         rows = [i for i in in_focus if i["status"] == status]
@@ -203,21 +214,12 @@ def cmd_status(fields, items, milestones, off_board):
     pickable = [i for i in open_items if i["status"] == "Ready" and not i["blocked_by"]
                 and i not in in_focus]
     section("Ready outside the Focus, unblocked", by_priority(pickable)[:15])
-    section("Waiting on owner", by_priority([i for i in open_items
-                                              if i["status"] == "Waiting on owner"]))
-    tests = [i for i in items if i["status"] == "Test"]
-    kinds = sorted({i["test_kind"] or "no kind" for i in tests})
-    print(f"\nManual tests owed ({len(tests)})")
-    for kind in kinds:
-        print(f" {kind}:")
-        for row in by_priority([i for i in tests if (i["test_kind"] or "no kind") == kind]):
-            print("  " + line(row))
     return 0
 
 
 def cmd_check(fields, items, milestones, off_board):
     errors, warnings = [], []
-    for name in ["Status", "Priority", "Test kind"]:
+    for name in ["Status", "Priority", OWNER_FIELD]:
         if name not in fields:
             errors.append(f"board has no '{name}' field")
     if len(milestones) > 1:
@@ -227,6 +229,13 @@ def cmd_check(fields, items, milestones, off_board):
         errors.append(f"#{issue['number']} is open but not on the board")
     for i in items:
         ref = f"#{i['number']} ({i['status'] or 'no status'})"
+        action = i["owner_action"]
+        if i["status"] == "Test" and action in (None, DECIDE):
+            errors.append(f"{ref} is in Test without a test Owner action")
+        elif i["status"] == "Waiting on owner" and action != DECIDE:
+            errors.append(f"{ref} is Waiting on owner without Owner action {DECIDE}")
+        elif action and i["status"] not in ("Test", "Waiting on owner"):
+            errors.append(f"{ref} still has Owner action {action}; clear it")
         if not i["open"]:
             if i["status"] not in ("Done", "Test"):
                 errors.append(f"{ref} is closed but not Done")
@@ -242,8 +251,6 @@ def cmd_check(fields, items, milestones, off_board):
         if i["status"] == "Test":
             if not i["has_manual_test"]:
                 errors.append(f"{ref} is in Test without a '## Manual test' section")
-            if not i["test_kind"]:
-                warnings.append(f"{ref} is in Test without a Test kind")
         if i["type"] == EPIC_TYPE:
             if i["milestone"]:
                 warnings.append(f"{ref} is an epic in a Focus; put its sub-issues there instead")
