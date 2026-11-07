@@ -1,0 +1,42 @@
+# Moves an issue to In Progress when the first branch for it is pushed.
+# Copy to .github/workflows/tracker-in-progress.yml; see issue-tracker.md › Board.
+#
+# Needs, in the repository settings:
+#   variable TRACKER_PROJECT  the board as <owner>/<number>, e.g. my-org/2
+#   secret   PROJECT_TOKEN    a token that can write that board (the built-in
+#                             GITHUB_TOKEN reaches only this repository, and an
+#                             organization's board is not part of it)
+#
+# The issue number comes from the branch name <type>/<number>-<slug>,
+# e.g. feat/1049-ble-reconnect. Branches without a number are ignored, and an
+# issue already in Review, Test or Done is left where it is.
+name: tracker-in-progress
+
+on:
+  create:
+
+jobs:
+  start:
+    if: github.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - id: issue
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          if [[ "$BRANCH" =~ ^[a-z]+/([0-9]+)(-|$) ]]; then
+            echo "number=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.issue.outputs.number
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: docs/tools
+      - if: steps.issue.outputs.number
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          PROJECT: ${{ vars.TRACKER_PROJECT }}
+        run: >
+          python3 docs/tools/tracker.py start "${{ steps.issue.outputs.number }}"
+          --project "$PROJECT" --repo "$GITHUB_REPOSITORY"
