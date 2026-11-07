@@ -60,6 +60,10 @@ Quick navigation to all docs. Read only what you need, when you need it.
 - Available jobs with commands and trigger classes (per-change / cycle-end)
 - Cycle-end binding; `/maintain` dispatches from this table
 
+**tools/tracker.py** - Board script for the Focus board model in `issue-tracker.md`
+
+- `status` (where are we), `check` (board rules), `roadmap` (Mermaid dependency graph)
+
 **[tools/evals.md](tools/evals.md)** - Triage eval cases (template: `tools/evals.template.md`)
 
 - Bug-report-phrased questions with expected entry points; run by `validation-llm`
@@ -91,7 +95,8 @@ Quick navigation to all docs. Read only what you need, when you need it.
 
 **[issue-tracker.md](issue-tracker.md)** - GitHub Issues and Projects v2 (template: `issue-tracker.template.md`)
 
-- Conventions (types, labels, sub-issues, project, estimates)
+- Conventions (types, labels, sub-issues, project, "blocked by" prerequisites)
+- Board: fields, Status columns, Focus (milestone), roadmap, manual test, views, board script
 - Issue Structure (required sections per type)
 - Wiki Mapping
 

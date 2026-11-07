@@ -1,6 +1,6 @@
 ---
 name: maintain
-description: Dispatch maintenance jobs from the jobs registry. Use "/maintain change" before creating a PR (diff-scoped checks) and "/maintain full" at the project's cycle-end event (sprint end, milestone close, or pre-release).
+description: Dispatch maintenance jobs from the jobs registry. Use "/maintain change" before creating a PR (diff-scoped checks) and "/maintain full" at the project's cycle-end event (Focus close, milestone close, or pre-release).
 argument-hint: "change | full"
 ---
 

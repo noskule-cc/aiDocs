@@ -17,5 +17,7 @@ Creates GitHub issues following `docs/issue-tracker.md`, the single source for t
 4. **Create** the issue, set its type and labels
 5. **Link** it to its parent epic with `addSubIssue`
 6. **Project**: if the project uses a board, add the issue and set the fields `docs/issue-tracker.md` lists
+7. **Prerequisites**: add a native "blocked by" link for every issue named as a prerequisite
+8. **Focus**: if the issue was found while working on the current Focus and must be solved for its goal, set that milestone
 
-Report the issue URL and every field you set.
+Report the issue URL, every field you set, and the milestone and blockers if any.
