@@ -28,9 +28,9 @@ Built for one developer working with AI agents: no time-boxed sprints, no estima
 |-----------|---------------|-------------------|
 | Status    | Single select | The built-in field, so GitHub's "Item closed" workflow sets Done. Columns below |
 | Priority  | Single select | High, Medium, Low |
-| Test kind | Single select | What a manual test needs, e.g. `[Device]` (a quick check, any time) and `[Real use]` (a real session of the product, e.g. a workout); name the options for the project |
+| Owner action | Single select | What the owner has to do, by the time it costs: **Decide** (answer questions, minutes, anywhere), `[Device check]` (a quick manual test), `[Real-world event]` (a test that needs an outing, e.g. a workout — collect several, then organise one); name the test options for the project |
 
-Enable the project workflows **Item closed** (→ Done), **Item added to project** and **Auto-add sub-issues to project**.
+Enable the project workflows **Item closed** (→ Done), **Pull request merged** (→ Done), **Pull request linked to issue** (→ Review), **Item added to project** (→ Backlog) and **Auto-add sub-issues to project**. Changing the Status options gives every option a new ID, and GitHub then switches off each workflow that pointed at an old one: set their targets and enable them again by hand.
 
 ### Status columns
 
@@ -40,12 +40,16 @@ Enable the project workflows **Item closed** (→ Done), **Item added to project
 | **Refine**           | Needs refinement or a precondition before it is actionable |
 | **Ready**            | Refined; actionable once nothing blocks it |
 | **In Progress**      | Being worked on |
-| **Waiting on owner** | Stopped on a decision only the owner can make; the issue holds the question as a numbered list |
+| **Waiting on owner** | Stopped on a decision only the owner can make; Owner action is Decide and the issue holds the questions as a numbered list |
 | **Review**           | PR open |
 | **Test**             | Merged; a manual test is still owed (see [Manual test](#manual-test)) |
 | **Done**             | Nothing owed |
 
 An issue moves to **Done** when nothing is owed, to **Test** when its PR leaves a manual test that tests and an emulator cannot replace. Merging closes the issue and the Item-closed workflow sets Done — move it back to Test by hand when a manual test is owed.
+
+### Work waiting for the owner
+
+An issue that needs the owner is in **Waiting on owner** (Owner action Decide) or in **Test** (Owner action names the kind of test). Owner action is cleared when the item leaves those columns. An agent that moves an issue to Waiting on owner @-mentions the owner in the comment with the numbered questions, so the owner is notified; it does not assign the issue. The Owner view groups everything by Owner action: decisions first, real-world events last, so the owner sees when enough have gathered to organise one.
 
 ### Focus
 
@@ -59,28 +63,28 @@ A Focus is a scope-bounded batch of work: the epics' issues to finish next, plus
 
 ### Roadmap
 
-Prerequisite order comes from "blocked by" links between issues; an epic is blocked through its sub-issues. `tracker.py roadmap` draws open epics and every linked issue as a Mermaid graph. Ready + no open blocker = can be picked up.
+Prerequisite order comes from "blocked by" links between issues; an epic is blocked through its sub-issues. GitHub's Roadmap layout needs dates, so the roadmap is a wiki page instead: `tracker.py roadmap --out <wiki page>` draws open epics and every linked issue as a Mermaid graph, regenerated when a Focus closes. Ready + no open blocker = can be picked up.
 
 ### Manual test
 
 An issue in **Test** carries a `## Manual test` section, in its body or a comment:
 
 - The PRs it covers and why no automated test or emulator covers it
-- **Test kind** set on the board, so tests needing a real session are batched into one
+- **Owner action** set on the board, so tests needing a real-world event are batched into one
 - The device and setup
 - Numbered steps, each with its **Expected:** result
 
 ### Views
 
-| View             | Layout | Filter |
-|------------------|--------|--------|
-| Focus            | Board  | `milestone:"<current Focus>" -status:Done` (update when a Focus closes) |
-| Next up          | Table  | `status:Ready no:milestone`, sorted by Priority |
-| Waiting on owner | Table  | `status:"Waiting on owner"` |
-| Manual test      | Table  | `status:Test`, grouped by Test kind |
-| Epics            | Table  | `type:Epic -status:Done` |
-| Bugs             | Table  | `type:Bug -status:Done` |
-| Backlog          | Table  | `status:Backlog,Refine` |
+| View    | Layout | Filter | Purpose |
+|---------|--------|--------|---------|
+| Backlog | Table  | `-status:Done` | Everything open |
+| Refine  | Table  | `status:Refine`, grouped by Parent issue | Where questions and uncertainty are; each card ends with its open question |
+| Epics   | Table  | `type:Epic -status:Done`, with Sub-issues progress | The big picture |
+| Bugs    | Table  | `type:Bug -status:Done`, sorted by Priority | Rank all bugs |
+| Ready   | Table  | `status:Ready no:milestone`, sorted by Priority | The pool the next Focus is picked from |
+| Focus   | Board  | `has:milestone -status:Done` | What is being done now; a closed Focus leaves nothing open behind, so the filter never needs updating |
+| Owner   | Table  | `has:owner-action`, grouped by Owner action | Work waiting for the owner |
 
 ### Board script
 
@@ -88,11 +92,11 @@ An issue in **Test** carries a `## Manual test` section, in its body or a commen
 
 | Command   | Shows |
 |-----------|-------|
-| `status`  | Current Focus by column, Ready-and-unblocked issues outside it, Waiting on owner, manual tests by kind — run at the start of a session |
-| `check`   | Rule violations: closed but not Done, open but off the board, Test without a Manual test section, more than one open Focus, Ready but blocked, issues without an epic |
+| `status`  | Work waiting for the owner by Owner action, the current Focus by column, Ready-and-unblocked issues outside it — run at the start of a session |
+| `check`   | Rule violations: closed but not Done, open but off the board, Test without a Manual test section, Owner action missing or left set, more than one open Focus, Ready but blocked, issues without an epic |
 | `roadmap` | Mermaid dependency graph; `--out <file>` writes it, e.g. to a wiki page |
 
 
 ## IDs
 
-`[Fill in at setup: project ID, field IDs and option IDs for Status, Priority and Test kind — discover with gh api graphql]`
+`[Fill in at setup: project ID, field IDs and option IDs for Status, Priority and Owner action — discover with gh api graphql]`

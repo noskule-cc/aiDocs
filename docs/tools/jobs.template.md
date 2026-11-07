@@ -49,7 +49,7 @@ Routing-effectiveness test: bug-report-phrased questions from `evals.md` run aga
 
 ### Check tracker
 
-Board rules from `issue-tracker.md` that a script can verify: closed but not Done, open but off the board, Test without a `## Manual test` section, more than one open Focus, Ready but blocked, issues without an epic. Delete this row and section when the project has no board.
+Board rules from `issue-tracker.md` that a script can verify: closed but not Done, open but off the board, Test without a `## Manual test` section, Owner action missing or left set, more than one open Focus, Ready but blocked, issues without an epic. Delete this row and section when the project has no board.
 
 1. Run `python docs/tools/tracker.py check --project <owner>/<number>` (needs a logged-in `gh`)
 2. Exit code non-zero on errors; fix each on the board, warnings are judgment calls
