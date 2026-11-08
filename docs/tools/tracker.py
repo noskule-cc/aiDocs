@@ -10,7 +10,8 @@ Reads the GitHub Projects v2 board, and moves issues on it:
   roadmap  Mermaid graph of open epics and issues linked by "blocked by"
   set      move an issue to a column; sets or clears Human action to match
   start    move an issue to In Progress unless it is already further along
-           (run by the tracker-in-progress workflow on a branch push)
+  review   move an issue to Review unless it is already further along
+           (both run by the tracker-in-progress workflow: branch push, PR opened)
 
 Stdlib only; talks to GitHub through the `gh` CLI (must be logged in).
 
@@ -19,7 +20,7 @@ Usage:
   python docs/tools/tracker.py check   --project <owner>/<number> [--repo <owner>/<name>] [--fix]
   python docs/tools/tracker.py roadmap --project <owner>/<number> [--repo <owner>/<name>] [--out FILE]
   python docs/tools/tracker.py set <issue> <column> [--action <Human action>] --project <owner>/<number> [--repo <owner>/<name>]
-  python docs/tools/tracker.py start <issue> --project <owner>/<number> [--repo <owner>/<name>]
+  python docs/tools/tracker.py start|review <issue> --project <owner>/<number> [--repo <owner>/<name>]
 """
 
 import argparse
@@ -458,8 +459,8 @@ def move(project, repo, number, status, requested=None, only_from=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("command", choices=["status", "check", "roadmap", "set", "start"])
-    parser.add_argument("issue", nargs="?", type=int, help="set/start: the issue number")
+    parser.add_argument("command", choices=["status", "check", "roadmap", "set", "start", "review"])
+    parser.add_argument("issue", nargs="?", type=int, help="set/start/review: the issue number")
     parser.add_argument("column", nargs="?", help="set: the Status column")
     parser.add_argument("--action", help=f"set: the {HUMAN_FIELD} for Test or {NEEDS_DECISION}")
     parser.add_argument("--project", required=True, help="<owner>/<project number>")
@@ -469,12 +470,16 @@ def main():
                         help="check: clear Human action left on a column that carries none")
     args = parser.parse_args()
     repo = args.repo or default_repo()
-    if args.command in ("set", "start"):
+    if args.command in ("set", "start", "review"):
         if args.issue is None or (args.command == "set") != bool(args.column):
-            parser.error("usage: set <issue> <column> | start <issue>")
+            parser.error("usage: set <issue> <column> | start <issue> | review <issue>")
+        # Forward moves only: an issue already further along stays where it is.
+        before_work = (None, "Backlog", "Refine", "Ready")
         if args.command == "start":
-            return move(args.project, repo, args.issue, "In Progress",
-                        only_from=(None, "Backlog", "Refine", "Ready"))
+            return move(args.project, repo, args.issue, "In Progress", only_from=before_work)
+        if args.command == "review":
+            return move(args.project, repo, args.issue, "Review",
+                        only_from=before_work + ("In Progress",))
         return move(args.project, repo, args.issue, args.column, requested=args.action)
     board = load_board(args.project, repo)
     if args.command == "status":

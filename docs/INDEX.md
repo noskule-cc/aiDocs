@@ -62,9 +62,9 @@ Quick navigation to all docs. Read only what you need, when you need it.
 
 **tools/tracker.py** - Board script for the Focus board model in `issue-tracker.md`
 
-- `status` (where are we), `check` (board rules), `roadmap` (Mermaid dependency graph), `set` / `start` (move an issue)
+- `status` (where are we), `check` (board rules), `roadmap` (Mermaid dependency graph), `set` / `start` / `review` (move an issue)
 
-**tools/tracker-in-progress.yml** - GitHub workflow: the first push of `<type>/<N>-<slug>` moves #N to In Progress
+**tools/tracker-in-progress.yml** - GitHub workflow: the first push of `<type>/<N>-<slug>` moves #N to In Progress, its PR to Review
 
 - Copied to `.github/workflows/`; needs the `TRACKER_PROJECT` variable and a `PROJECT_TOKEN` secret
 

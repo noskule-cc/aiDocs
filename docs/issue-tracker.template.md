@@ -52,7 +52,7 @@ Who moves an issue:
 | Move | By |
 |------|----|
 | → In Progress | the `tracker-in-progress` workflow, on the first push of `<type>/<N>-<slug>` |
-| → Review | the "Pull request linked to issue" workflow |
+| → Review | the `tracker-in-progress` workflow when the PR opens (GitHub's "Pull request linked to issue" needs `Closes #N`) |
 | → Done | merge of a PR that says `Closes #N` (closes the issue, Item closed sets Done) |
 | → Test | the agent, `tracker.py set <N> Test --action <kind>`, with `Part of #N` in the PR |
 | Test → Done | the human, by dragging the card; Auto-close closes the issue |
@@ -109,9 +109,9 @@ An issue in **Test** carries a `## Manual test` section, in its body or a commen
 | `check`   | Rule violations: closed but not Done, open but off the board, Test without a Manual test section, Human action missing or left set, more than one open Focus, Ready but blocked, issues without an epic. `--fix` clears a Human action left set |
 | `roadmap` | Mermaid dependency graph; `--out <file>` writes it |
 | `set <N> <column> [--action <kind>]` | Moves an issue and sets or clears Human action to match; adds it to the board if missing |
-| `start <N>` | Moves an issue to In Progress unless it is already further along |
+| `start <N>` / `review <N>` | Moves an issue to In Progress / Review unless it is already further along |
 
-`docs/tools/tracker-in-progress.yml` runs `start` on every new branch: copy it to `.github/workflows/`, set the repository variable `TRACKER_PROJECT` to `<owner>/<number>`, and store a token that can write the board as the secret `PROJECT_TOKEN`. The built-in `GITHUB_TOKEN` reaches only the repository, and an organization's board is not part of it. A fine-grained token: resource owner = the board's owner, the repository only, Issues read, organization permission Projects read and write.
+`docs/tools/tracker-in-progress.yml` runs `start` on every new branch and `review` when its PR opens: copy it to `.github/workflows/`, set the repository variable `TRACKER_PROJECT` to `<owner>/<number>`, and store a token that can write the board as the secret `PROJECT_TOKEN`. The built-in `GITHUB_TOKEN` reaches only the repository, and an organization's board is not part of it. A fine-grained token: resource owner = the board's owner, the repository only, Issues read, organization permission Projects read and write.
 
 
 ## IDs
