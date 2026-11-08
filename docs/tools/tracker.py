@@ -87,7 +87,8 @@ query($owner: String!, $name: String!, $cursor: String) {
 """
 
 
-def gh_graphql(query, **variables):
+def gh_graphql(query, tolerate=None, **variables):
+    """Run a GraphQL query; tolerate: an error text that returns None instead of exiting."""
     cmd = ["gh", "api", "graphql", "-f", f"query={query}"]
     for key, value in variables.items():
         if value is None:
@@ -96,6 +97,8 @@ def gh_graphql(query, **variables):
         cmd += [flag, f"{key}={value}"]
     result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
     if result.returncode != 0:
+        if tolerate and tolerate in result.stderr:
+            return None
         sys.exit(f"gh api graphql failed: {result.stderr.strip()}")
     return json.loads(result.stdout)["data"]
 
@@ -421,10 +424,14 @@ def move(project, repo, number, status, requested=None, only_from=None):
         if name not in fields:
             sys.exit(f"board has no single-select field '{name}'")
     repo_owner, repo_name = repo.split("/")
-    issue = gh_graphql(ISSUE_ITEM_QUERY, owner=repo_owner, name=repo_name,
-                       number=number)["repository"]["issue"]
-    item = next((i for i in issue["projectItems"]["nodes"]
-                 if i["project"]["id"] == board["id"]), None)
+
+    def board_item():
+        issue = gh_graphql(ISSUE_ITEM_QUERY, owner=repo_owner, name=repo_name,
+                           number=number)["repository"]["issue"]
+        return issue, next((i for i in issue["projectItems"]["nodes"]
+                            if i["project"]["id"] == board["id"]), None)
+
+    issue, item = board_item()
     current = single(item.get("status")) if item else None
     current_action = single(item.get("humanAction")) if item else None
     if only_from is not None and current not in only_from:
@@ -433,7 +440,11 @@ def move(project, repo, number, status, requested=None, only_from=None):
     action = human_action_for(status, requested, current_action,
                               [o["name"] for o in fields[HUMAN_FIELD]["options"]])
     if item is None:
-        item = gh_graphql(ADD_ITEM, p=board["id"], c=issue["id"])["addProjectV2ItemById"]["item"]
+        # A project workflow (auto-add) may add the issue at the same moment.
+        added = gh_graphql(ADD_ITEM, tolerate="already exists", p=board["id"], c=issue["id"])
+        item = added["addProjectV2ItemById"]["item"] if added else board_item()[1]
+        if item is None:
+            sys.exit(f"#{number} was just added to the board by another workflow; run again")
     gh_graphql(SET_VALUE, p=board["id"], i=item["id"], f=fields["Status"]["id"],
                o=option_id(fields["Status"], status))
     if action:
