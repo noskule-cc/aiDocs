@@ -113,7 +113,6 @@ docs/
 ├── issue-tracker.template.md       # Issue tracker conventions
 ├── wiki.template.md                # Wiki setup and configuration
 ├── changelog.template.md           # Release history template
-├── design-sync.template.md         # Design ↔ code sync (Pencil)
 ├── skills-and-agents.template.md   # Registry routing every AI tool to .claude/
 ├── CREATING_AGENTS.md              # How to create and register skills and agents
 └── tools/

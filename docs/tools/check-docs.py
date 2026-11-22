@@ -19,7 +19,7 @@ from pathlib import Path
 PER_PROJECT = {
     "installation.md", "development.md", "testing.md", "release.md",
     "changelog.md", "architecture-rules.md",
-    "issue-tracker.md", "wiki.md", "design-sync.md", "project-index.md",
+    "issue-tracker.md", "wiki.md", "project-index.md",
     "skills-and-agents.md", "tools/jobs.md", "feature-map.md",
     "tools/evals.md",
 }
