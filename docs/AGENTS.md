@@ -32,7 +32,6 @@ Read these **when you reach that situation**, not upfront:
 | Creating skills/agents  | `CREATING_AGENTS.md`          |
 | Creating GitHub issues  | `issue-tracker.md`            |
 | Running a job           | `tools/jobs.md`               |
-| Syncing design ↔ code   | `design-sync.md`              |
 
 **Project-specific situations** (threat model, special test docs, ...) are listed in [project-index.md](project-index.md), if it exists — never add rows to the table above.
 
