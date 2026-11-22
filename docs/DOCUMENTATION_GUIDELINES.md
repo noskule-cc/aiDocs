@@ -91,6 +91,28 @@ flowchart TB
     VLLM["validation-llm"] -.->|"tests entry path"| FIXED
 ```
 
+### Repo vs. Agent Memory
+
+The axes and layers place content inside the project. One question comes first: does a fact belong to the project at all, or only to one agent? An agent keeps stores that the project never sees:
+
+| Store | Who sees it | Lasts | Reviewed in a PR |
+|-------|-------------|-------|------------------|
+| Session transcript, scratch files | one session | until a restart or cleanup | no |
+| Agent memory | one user on one machine | across that user's sessions | no |
+| Code, `/docs`, wiki, issues, PRs | everyone on the project | as long as the project | yes |
+
+**Test:** would an agent of a teammate, on another machine with empty memory, need this fact? Then it belongs to the project, in its single home:
+
+| Fact | Home |
+|------|------|
+| Decision, finding, test result of a task | its issue or PR |
+| Evidence, such as before-and-after images or logs | a PR comment |
+| Rule for agents working on this project, including a correction the user gave once | the project's root `AGENTS.md`, or the skill it belongs to |
+| How the software behaves, how-tos | wiki |
+| Build, test, release steps | `/docs` |
+
+Agent memory keeps only what is personal to one user or machine (preferences, accounts, local paths) and pointers to the project home of a fact. When a session ends, nothing the project needs is left only in the transcript, the scratch files, or memory. Never commit session transcripts: they are large, cannot be reviewed, and carry private data.
+
 ### Code Documentation
 
 Apply Information Minimalism. Document only what isn't obvious from reading the code.
@@ -232,4 +254,4 @@ Applies to both docs/ and wiki/.
 
 ---
 
-**Last Updated:** 2026-09-19
+**Last Updated:** 2026-11-22
