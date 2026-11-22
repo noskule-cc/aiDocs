@@ -84,6 +84,7 @@ aiDocs prescribes no development workflow — how work is organised, reviewed, t
 
 - **Discoveries captured** — reusable technical knowledge from the session (API quirks, workarounds, how external systems actually behave) is on the wiki
 - **Docs updated** — `changelog.md`, plus docs and wiki per [DOCUMENTATION_GUIDELINES.md](DOCUMENTATION_GUIDELINES.md), with the Information Minimalism test applied
+- **Nothing left only with the agent** — decisions, evidence, and rules from the session are in the issue, the PR, `AGENTS.md`, or the wiki, not only in the transcript, scratch files, or agent memory (see "Repo vs. Agent Memory" in [DOCUMENTATION_GUIDELINES.md](DOCUMENTATION_GUIDELINES.md))
 - **Maintenance run** — `/maintain change` ran on the branch diff and its findings are fixed (registry: [tools/jobs.md](tools/jobs.md))
 
 
@@ -99,4 +100,4 @@ Two kinds of specialized instructions:
 > **Setup:** See [CREATING_AGENTS.md](CREATING_AGENTS.md) for how to create and register skills and agents.
 
 
-**Last Updated:** 2026-09-19
+**Last Updated:** 2026-11-22

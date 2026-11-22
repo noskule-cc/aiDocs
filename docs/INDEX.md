@@ -22,6 +22,7 @@ Quick navigation to all docs. Read only what you need, when you need it.
 - Information Minimalism Test
 - Documentation Levels (Code, /docs, Wiki)
 - Doc-System Layer Model (content axes, layers, verification diagram)
+- Repo vs. Agent Memory (what belongs to the project, what stays with one agent)
 - Diagrams (Mermaid conventions, when to use, placement)
 - Documenting in Code
 - Documenting in /docs (File Tree)
