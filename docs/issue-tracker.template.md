@@ -6,18 +6,61 @@ Project management using GitHub Issues and Projects v2.
 
 Types, labels, and project fields are discoverable via the GitHub API. These rules aren't:
 
-1. **Use issue types** for classification — not labels
-2. **Use labels** for the feature area the issue touches
+1. **Use issue types** for classification — not labels. Where the repository lacks a type, use the `type:<name>` labels of [Types without issue types](#types-without-issue-types)
+2. **Use labels** for the feature area the issue touches ([Labels](#labels))
 3. **Label the feature, not the data.** Most issues need one label
-4. **Use the sub-issue feature** to link children to epics
+4. **Use the sub-issue feature** to link children to their parent; the [hierarchy](#hierarchy) says which type sits where
 5. **Add every issue to the project**
 6. **Set Status** to Backlog unless otherwise stated
-7. **Link prerequisites** with GitHub's native "blocked by" relation, never only in prose — "what's next" and the roadmap are built from it
+7. **Link prerequisites** with GitHub's native "blocked by" relation, never in prose — "what's next", the roadmap and the epic's work graph are built from it
 8. **Title format** — imperative verb + concise description. An epic's title names its area ("Backup & Restore"), with no "Epic:" prefix: the Epic type marks it
 9. **Link PRs to issues** — `Closes #N` only when the PR leaves nothing owed; when a manual test is still owed it says `Part of #N`, so the issue stays open in Test until the test passes
 10. **Branch name** — `<type>/<issue number>-<slug>`, e.g. `feat/123-csv-export`; the first push moves the issue to In Progress
 11. **Update wiki** when closing issues that add significant functionality
 12. **Sign as an agent** — if you are an AI agent, put your signature on the **first line** of every issue body, issue or PR comment and PR body you draft: `` — 🤖 <model name> (`<model ID>`) ``, with your actual model name and exact model ID. The posting account no longer tells who wrote it; humans never sign
+
+
+## Hierarchy
+
+Two structures meet in an issue. The **product** (what the system is: the wiki, never finished) is described by the wiki; the **work** (how and when it was built) is described by issues. Labels are the link: filtering by a label gives all work on one feature, without making features into epics.
+
+| Level | Types | Is | Closes when |
+|-------|-------|----|-------------|
+| **Epic** | Epic | a deliverable increment (an MVP, "iOS port phase 1"); may span several features | its last sub-issue closes, and the owner agrees (rule 5) |
+| **Feature** | Feature, Story | one user-visible change; names the wiki page it changes | the page is updated and its acceptance scenarios pass |
+| **Task** | Task, Bug, Spike, Refactor, Documentation, Idea | one PR-sized unit | its PR merges |
+
+Rules, each one checked by `check-issues.py` ([Issue script](#issue-script)):
+
+1. **At most three levels deep**: epic, feature, task, or epic, task, sub-task. GitHub allows deeper nesting; the standard does not
+2. **An epic is top level.** Every other issue belongs to an epic: its parent chain ends at one. A bug that fits no epic may stay parentless, but then nothing may sit under it. A feature sits directly under an epic, never under a feature or a task
+3. **Every issue has a type**: the native issue type, or a `type:` label where there are none
+4. **Order only through native "blocked by"**, never in prose ("Depends on #5" cannot be read by any tool). Blockers outside the epic or repository are fine
+5. **An epic is never a standing section.** It has acceptance criteria and can close; a standing epic (Maintenance) says so with a `Standing: yes` line in its body (the word "standing" elsewhere does not count). An agent proposes closing it, the owner closes it
+6. **A feature names its wiki page** in a `Wiki: <page or link>` line. A spike ends in a decision that the affected wiki page links
+7. **A feature label per issue**: one, two only when it spans two features equally (see [Labels](#labels))
+
+No estimates: work is ordered by "blocked by" and grouped in a Focus, not sized. A project that does estimate puts them on tasks only and lets parents sum; `check-issues.py` does not check them.
+
+### Types without issue types
+
+Whether a repository has issue types depends on the owner and the repository: an organization defines its own, a user-owned repository may have GitHub's defaults (Task, Bug, Feature) or none, and none of them has an Epic type unless it was added. Check with `gh api graphql -f query='{repository(owner:"<owner>",name:"<name>"){issueTypes(first:20){nodes{name}}}}'`. For every type a repository lacks, fall back to labels, one per type, named like the type in lower case:
+
+`type:epic` · `type:feature` · `type:story` · `type:task` · `type:bug` · `type:spike` · `type:refactor` · `type:documentation` · `type:idea`
+
+Create them once (`gh label create type:epic --repo <owner>/<name>`, per repository). Everything in this standard that says "type" reads either; an issue may carry the native type, the label, or both, and if it carries both they must agree. `check-issues.py` and `tracker.py` read both. A board view filters on `label:type:epic` instead of `type:Epic`. A project spanning several repositories needs the labels in each.
+
+## Labels
+
+Labels name the **feature** an issue touches, not an organizational concept (types classify). Keep one label set per project, and mirror the product: a label per wiki section or product feature, so one filter gives all work on it. Cross-cutting labels (`SYSTEM` for tooling and CI, `security`) are allowed.
+
+`[Fill in at setup: the area labels and the wiki pages each covers]`
+
+| Label | Wiki pages |
+|-------|------------|
+| `<feature>` | `<page-prefix>-*.md` |
+
+A feature is not an epic: an epic is a deliverable increment that closes, a label stays. `check-issues.py` takes every label except `type:` labels and GitHub's nine defaults (`bug`, `documentation`, `duplicate`, `enhancement`, `good first issue`, `help wanted`, `invalid`, `question`, `wontfix`) as a feature label; pass `--exempt-label` for others that are not features.
 
 
 ## Board
@@ -113,6 +156,20 @@ An issue in **Test** carries a `## Manual test` section, in its body or a commen
 
 `docs/tools/tracker-in-progress.yml` runs `start` on every new branch and `review` when its PR opens: copy it to `.github/workflows/`, set the repository variable `TRACKER_PROJECT` to `<owner>/<number>`, and store a token that can write the board as the secret `PROJECT_TOKEN`. The built-in `GITHUB_TOKEN` reaches only the repository, and an organization's board is not part of it. A fine-grained token: resource owner = the board's owner, the repository only, Issues read, organization permission Projects read and write.
 
+
+## Issue script
+
+`python docs/tools/check-issues.py [--repo <owner>/<name> ...]` reads the issues over the API (no board needed; repeat `--repo` for a project spanning repositories) and exits 1 on:
+
+- an issue without a type, with an unknown or conflicting one, or without a feature label (an epic without one only warns; more than two labels warns)
+- a non-bug without a parent, an epic with a parent, a feature under anything but an epic, an issue whose parent chain does not end at an epic, nesting deeper than three levels
+- an epic without acceptance criteria (and without a `Standing: yes` line); a closed epic with open sub-issues; it warns when every sub-issue of an open epic is closed, or when it has none
+- "Depends on #n" / "Blocked by #n" / "Blocks #n" in prose with no native link (code and comments are ignored)
+- a Feature naming no wiki page: a warning, an error with `--require-wiki`
+
+Issue state is not in any diff, so it is not a `/maintain change` job: the `issue-writer` agent runs it after creating issues, and `/maintain full` runs it at cycle end.
+
+`python docs/tools/issue-graph.py <epic> [--repo <owner>/<name>] [--write]` renders the epic's sub-issues and their blocked-by links as a Mermaid flowchart (feature groups its tasks; arrow: blocker to blocked). `--write` puts it into the epic's body between `<!-- work-graph:start -->` and `<!-- work-graph:end -->`, replacing the previous one; never draw it by hand. Rerun it after the links change.
 
 ## IDs
 

@@ -1,0 +1,185 @@
+#!/usr/bin/env python3
+"""Work graph of an epic: its sub-issues and their blocked-by links as Mermaid.
+
+Prints the graph, or with --write puts it into the epic's body between
+`<!-- work-graph:start -->` and `<!-- work-graph:end -->` (appended on first
+use, replaced afterwards, so a rerun changes nothing unless the work did).
+The graph is generated, never drawn by hand: the blocked-by links are the source.
+
+Stdlib only; talks to GitHub through the `gh` CLI (must be logged in).
+
+Usage:
+  python docs/tools/issue-graph.py <epic number> [--repo <owner>/<name>] [--write]
+"""
+
+import argparse
+import os
+import re
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import tracker  # noqa: E402
+
+START = "<!-- work-graph:start -->"
+END = "<!-- work-graph:end -->"
+TITLE_LIMIT = 48
+
+# A list that fills its page may be cut off, which --write refuses. The product of the limits
+# stays under GitHub's 500,000-node cap per query (100 x 100 x 20 blockers).
+SUB_LIMIT, BLOCKER_LIMIT = 100, 20
+NODE_FIELDS = """
+  number title state repository { nameWithOwner }
+  blockedBy(first: %(blockers)d) { pageInfo { hasNextPage } nodes { number title state repository { nameWithOwner } } }
+""" % {"blockers": BLOCKER_LIMIT}
+# Epic, its features and their tasks: the three levels the standard allows.
+EPIC_QUERY = """
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      body %(fields)s
+      subIssues(first: %(limit)d) { pageInfo { hasNextPage } nodes { %(fields)s
+        subIssues(first: %(limit)d) { pageInfo { hasNextPage } nodes { %(fields)s } } } }
+    }
+  }
+}
+""" % {"fields": NODE_FIELDS, "limit": SUB_LIMIT}
+
+
+def tree(node):
+    """An issue and its sub-issues, keyed by (repo, number): a number alone repeats across repositories."""
+    sub_issues = node.get("subIssues", {})
+    return {
+        "key": (node["repository"]["nameWithOwner"], node["number"]),
+        "title": node["title"],
+        "open": node["state"] == "OPEN",
+        "blocked_by": [((b["repository"]["nameWithOwner"], b["number"]), b["title"], b["state"] == "OPEN")
+                       for b in node["blockedBy"]["nodes"]],
+        "children": [tree(child) for child in sub_issues.get("nodes", [])],
+        "cut_off": node["blockedBy"]["pageInfo"]["hasNextPage"]
+                   or sub_issues.get("pageInfo", {}).get("hasNextPage", False),
+    }
+
+
+def cut_off(epic):
+    """The issues whose sub-issues or blockers did not fit one page."""
+    return [issue["key"] for issue in [epic, *walk(epic)] if issue["cut_off"]]
+
+
+def node_id(key, home):
+    repo, number = key
+    return f"i{number}" if repo == home else f"i{number}_" + re.sub(r"\W", "_", repo)
+
+
+def label(key, title, home):
+    repo, number = key
+    title = title.replace('"', "'")
+    if len(title) > TITLE_LIMIT:
+        title = title[:TITLE_LIMIT - 1] + "…"
+    return f"#{number} {title}" if repo == home else f"{repo}#{number} {title}"
+
+
+def walk(node):
+    for child in node["children"]:
+        yield child
+        yield from walk(child)
+
+
+def render(epic):
+    """The fenced Mermaid block for an epic tree: blocker --> blocked, sub-issues grouped."""
+    home = epic["key"][0]
+    members = {issue["key"]: issue for issue in walk(epic)}
+    lines = ["flowchart LR"]
+
+    def emit(issue, indent):
+        pad = "  " * indent
+        text = f'["{label(issue["key"], issue["title"], home)}"]'
+        if issue["children"]:
+            lines.append(f'{pad}subgraph {node_id(issue["key"], home)}{text}')
+            lines.append(f"{pad}  direction TB")
+            for child in issue["children"]:
+                emit(child, indent + 1)
+            lines.append(f"{pad}end")
+        else:
+            lines.append(f'{pad}{node_id(issue["key"], home)}{text}')
+
+    for child in epic["children"]:
+        emit(child, 1)
+    edges, outside = [], {}
+    for issue in members.values():
+        for key, title, is_open in issue["blocked_by"]:
+            edges.append((node_id(key, home), node_id(issue["key"], home)))
+            if key not in members:
+                outside[key] = (title, is_open)
+    for key, (title, _) in sorted(outside.items()):
+        lines.append(f'  {node_id(key, home)}["{label(key, title, home)}<br>outside this epic"]')
+    for blocker, blocked in sorted(set(edges)):
+        lines.append(f"  {blocker} --> {blocked}")
+    closed = [node_id(key, home) for key, issue in members.items() if not issue["open"]]
+    closed += [node_id(key, home) for key, (_, is_open) in outside.items() if not is_open]
+    if closed:
+        lines.append("  classDef closed fill:#d4edda,stroke:#2e7d32")
+        lines.append(f"  class {','.join(sorted(closed))} closed")
+    if outside:
+        lines.append("  classDef outside stroke-dasharray:5 3")
+        lines.append(f"  class {','.join(node_id(key, home) for key in sorted(outside))} outside")
+    note = "Arrow: blocker → blocked. Green = closed. Generated by `docs/tools/issue-graph.py`; do not edit."
+    return "```mermaid\n" + "\n".join(lines) + "\n```\n\n" + note
+
+
+def splice(body, block):
+    """Put the block between the markers of a body; append the markers when missing.
+
+    Raises ValueError for any shape other than no marker, or one start before one end:
+    replacing between a stray start and a later end would delete the text in between.
+    """
+    section = f"{START}\n{block}\n{END}"
+    starts, ends = body.count(START), body.count(END)
+    if (starts, ends) == (0, 0):
+        return body.rstrip("\n") + "\n\n" + section + "\n"
+    if (starts, ends) != (1, 1) or body.index(START) > body.index(END):
+        raise ValueError(f"the body has {starts} start and {ends} end markers; it needs none, or one start "
+                         f"before one end. Fix the markers by hand")
+    return body[:body.index(START)] + section + body[body.index(END) + len(END):]
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("epic", type=int, help="the epic's issue number")
+    parser.add_argument("--repo", help="<owner>/<name>; default: the current repository")
+    parser.add_argument("--write", action="store_true", help="write the graph into the epic's body")
+    args = parser.parse_args()
+    tracker.utf8_output()
+    repo = args.repo or tracker.default_repo()
+    owner, name = repo.split("/")
+    node = tracker.gh_graphql(EPIC_QUERY, owner=owner, name=name, number=args.epic)["repository"]["issue"]
+    if node is None:
+        sys.exit(f"{repo}#{args.epic} not found")
+    root = tree(node)
+    block = render(root)
+    cut = cut_off(root)
+    if cut:
+        print(f"warning: {SUB_LIMIT} sub-issues or {BLOCKER_LIMIT} blockers fill a page on "
+              + ", ".join(f"{r}#{n}" for r, n in cut) + "; the graph is incomplete", file=sys.stderr)
+    if not args.write:
+        print(block)
+        return 0
+    if cut:
+        sys.exit("refusing --write: the graph is incomplete")
+    try:
+        body = splice(node["body"] or "", block)
+    except ValueError as error:
+        sys.exit(f"{repo}#{args.epic}: {error}")
+    if body == (node["body"] or ""):
+        print(f"{repo}#{args.epic}: work graph already current")
+        return 0
+    result = subprocess.run(["gh", "issue", "edit", str(args.epic), "--repo", repo, "--body-file", "-"],
+                            input=body, capture_output=True, text=True, encoding="utf-8")
+    if result.returncode != 0:
+        sys.exit(f"gh issue edit failed: {result.stderr.strip()}")
+    print(f"{repo}#{args.epic}: work graph written")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

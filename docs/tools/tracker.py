@@ -32,8 +32,9 @@ import sys
 STATUSES = ["Backlog", "Refine", "Ready", "In Progress", "Needs decision",
             "Review", "Test", "Done"]
 NEEDS_DECISION = "Needs decision"
-EPIC_TYPE = "Epic"
-BUG_TYPE = "Bug"
+EPIC_TYPE = "epic"  # type names are lower case: see type_names
+BUG_TYPE = "bug"
+TYPE_LABEL_PREFIX = "type:"
 HUMAN_FIELD = "Human action"
 DECIDE = "Decide"  # the Human action that pairs with "Needs decision"
 HUMAN_STATUSES = (NEEDS_DECISION, "Test")  # the columns that carry a Human action
@@ -52,6 +53,7 @@ ITEM_FIELDS = """
       repository { nameWithOwner }
       milestone { title state }
       issueType { name }
+      labels(first: 30) { nodes { name } }
       parent { number }
       blockedBy(first: 50) { nodes { number state } }
       comments(last: 30) { nodes { body } }
@@ -118,6 +120,27 @@ def default_repo():
     return result.stdout.strip()
 
 
+def utf8_output():
+    """Print UTF-8 whatever the console or a redirect would pick (cp1252 on Windows cannot show → or …)."""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
+
+
+def type_names(native_type, label_names):
+    """The lower-case type names of an issue: its native issue type and its `type:<name>` labels."""
+    names = {native_type.lower()} if native_type else set()
+    names |= {name[len(TYPE_LABEL_PREFIX):].strip().lower() for name in label_names
+              if name.lower().startswith(TYPE_LABEL_PREFIX)}
+    return names
+
+
+def single_type(native_type, label_names):
+    """The one type of an issue, or None when it has none or they conflict."""
+    names = type_names(native_type, label_names)
+    return next(iter(names)) if len(names) == 1 else None
+
+
 def single(value):
     return (value or {}).get("name")
 
@@ -146,7 +169,8 @@ def load_board(project, repo):
                 "status": single(node.get("status")),
                 "human_action": single(node.get("humanAction")),
                 "priority": single(node.get("priority")),
-                "type": (issue.get("issueType") or {}).get("name"),
+                "type": single_type((issue.get("issueType") or {}).get("name"),
+                                    [label["name"] for label in issue["labels"]["nodes"]]),
                 "parent": (issue.get("parent") or {}).get("number"),
                 "milestone": (issue.get("milestone") or {}).get("title"),
                 "blocked_by": [b["number"] for b in issue["blockedBy"]["nodes"]
