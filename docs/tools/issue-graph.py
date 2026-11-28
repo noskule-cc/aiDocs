@@ -25,11 +25,13 @@ START = "<!-- work-graph:start -->"
 END = "<!-- work-graph:end -->"
 TITLE_LIMIT = 48
 
-LIMIT = 100  # GitHub's page size cap; a list that fills it may be cut off, which --write refuses
+# A list that fills its page may be cut off, which --write refuses. The product of the limits
+# stays under GitHub's 500,000-node cap per query (100 x 100 x 20 blockers).
+SUB_LIMIT, BLOCKER_LIMIT = 100, 20
 NODE_FIELDS = """
   number title state repository { nameWithOwner }
-  blockedBy(first: %d) { pageInfo { hasNextPage } nodes { number title state repository { nameWithOwner } } }
-""" % LIMIT
+  blockedBy(first: %(blockers)d) { pageInfo { hasNextPage } nodes { number title state repository { nameWithOwner } } }
+""" % {"blockers": BLOCKER_LIMIT}
 # Epic, its features and their tasks: the three levels the standard allows.
 EPIC_QUERY = """
 query($owner: String!, $name: String!, $number: Int!) {
@@ -41,7 +43,7 @@ query($owner: String!, $name: String!, $number: Int!) {
     }
   }
 }
-""" % {"fields": NODE_FIELDS, "limit": LIMIT}
+""" % {"fields": NODE_FIELDS, "limit": SUB_LIMIT}
 
 
 def tree(node):
@@ -157,7 +159,7 @@ def main():
     block = render(root)
     cut = cut_off(root)
     if cut:
-        print(f"warning: more than {LIMIT} sub-issues or blockers on "
+        print(f"warning: {SUB_LIMIT} sub-issues or {BLOCKER_LIMIT} blockers fill a page on "
               + ", ".join(f"{r}#{n}" for r, n in cut) + "; the graph is incomplete", file=sys.stderr)
     if not args.write:
         print(block)
