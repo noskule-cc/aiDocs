@@ -6,7 +6,7 @@ Project management using GitHub Issues and Projects v2.
 
 Types, labels, and project fields are discoverable via the GitHub API. These rules aren't:
 
-1. **Use issue types** for classification — not labels. Where the account has no issue types (personal accounts), use the `type:<name>` labels of [Types without issue types](#types-without-issue-types)
+1. **Use issue types** for classification — not labels. Where the repository lacks a type, use the `type:<name>` labels of [Types without issue types](#types-without-issue-types)
 2. **Use labels** for the feature area the issue touches ([Labels](#labels))
 3. **Label the feature, not the data.** Most issues need one label
 4. **Use the sub-issue feature** to link children to their parent; the [hierarchy](#hierarchy) says which type sits where
@@ -33,10 +33,10 @@ Two structures meet in an issue. The **product** (what the system is: the wiki, 
 Rules, each one checked by `check-issues.py` ([Issue script](#issue-script)):
 
 1. **At most three levels deep**: epic, feature, task, or epic, task, sub-task. GitHub allows deeper nesting; the standard does not
-2. **An epic is top level.** Every other issue has a parent epic or feature; a bug that fits no epic may stay parentless. A feature never sits under a task
+2. **An epic is top level.** Every other issue belongs to an epic: its parent chain ends at one. A bug that fits no epic may stay parentless, but then nothing may sit under it. A feature sits directly under an epic, never under a feature or a task
 3. **Every issue has a type**: the native issue type, or a `type:` label where there are none
 4. **Order only through native "blocked by"**, never in prose ("Depends on #5" cannot be read by any tool). Blockers outside the epic or repository are fine
-5. **An epic is never a standing section.** It has acceptance criteria and can close; a standing epic (Maintenance) says so in its body. An agent proposes closing it, the owner closes it
+5. **An epic is never a standing section.** It has acceptance criteria and can close; a standing epic (Maintenance) says so with a `Standing: yes` line in its body (the word "standing" elsewhere does not count). An agent proposes closing it, the owner closes it
 6. **A feature names its wiki page** in a `Wiki: <page or link>` line. A spike ends in a decision that the affected wiki page links
 7. **A feature label per issue**: one, two only when it spans two features equally (see [Labels](#labels))
 
@@ -44,11 +44,11 @@ No estimates: work is ordered by "blocked by" and grouped in a Focus, not sized.
 
 ### Types without issue types
 
-Issue types exist only for organizations. A personal account falls back to labels, one per type, named like the type in lower case:
+Whether a repository has issue types depends on the owner and the repository: an organization defines its own, a user-owned repository may have GitHub's defaults (Task, Bug, Feature) or none, and none of them has an Epic type unless it was added. Check with `gh api graphql -f query='{repository(owner:"<owner>",name:"<name>"){issueTypes(first:20){nodes{name}}}}'`. For every type a repository lacks, fall back to labels, one per type, named like the type in lower case:
 
 `type:epic` · `type:feature` · `type:story` · `type:task` · `type:bug` · `type:spike` · `type:refactor` · `type:documentation` · `type:idea`
 
-Create them once (`gh label create type:epic --repo <owner>/<name>`, per repository). Everything in this standard that says "type" reads either; an issue carries one or the other, and if it carries both they must agree. A board view filters on `label:type:epic` instead of `type:Epic`. A project spanning several repositories needs the labels in each.
+Create them once (`gh label create type:epic --repo <owner>/<name>`, per repository). Everything in this standard that says "type" reads either; an issue may carry the native type, the label, or both, and if it carries both they must agree. `check-issues.py` and `tracker.py` read both. A board view filters on `label:type:epic` instead of `type:Epic`. A project spanning several repositories needs the labels in each.
 
 ## Labels
 
@@ -60,7 +60,7 @@ Labels name the **feature** an issue touches, not an organizational concept (typ
 |-------|------------|
 | `<feature>` | `<page-prefix>-*.md` |
 
-A feature is not an epic: an epic is a deliverable increment that closes, a label stays. `check-issues.py` takes every label except `type:` labels and GitHub's defaults (`bug`, `enhancement`, `question`, …) as a feature label; pass `--exempt-label` for others that are not features.
+A feature is not an epic: an epic is a deliverable increment that closes, a label stays. `check-issues.py` takes every label except `type:` labels and GitHub's nine defaults (`bug`, `documentation`, `duplicate`, `enhancement`, `good first issue`, `help wanted`, `invalid`, `question`, `wontfix`) as a feature label; pass `--exempt-label` for others that are not features.
 
 
 ## Board
@@ -162,8 +162,8 @@ An issue in **Test** carries a `## Manual test` section, in its body or a commen
 `python docs/tools/check-issues.py [--repo <owner>/<name> ...]` reads the issues over the API (no board needed; repeat `--repo` for a project spanning repositories) and exits 1 on:
 
 - an issue without a type, with an unknown or conflicting one, or without a feature label (an epic without one only warns; more than two labels warns)
-- a non-bug without a parent, an epic with a parent, a feature under a task, nesting deeper than three levels
-- an epic without acceptance criteria (and not marked standing); a closed epic with open sub-issues; it warns when every sub-issue of an open epic is closed, or when it has none
+- a non-bug without a parent, an epic with a parent, a feature under anything but an epic, an issue whose parent chain does not end at an epic, nesting deeper than three levels
+- an epic without acceptance criteria (and without a `Standing: yes` line); a closed epic with open sub-issues; it warns when every sub-issue of an open epic is closed, or when it has none
 - "Depends on #n" / "Blocked by #n" / "Blocks #n" in prose with no native link (code and comments are ignored)
 - a Feature naming no wiki page: a warning, an error with `--require-wiki`
 

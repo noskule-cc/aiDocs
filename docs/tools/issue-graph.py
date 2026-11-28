@@ -25,40 +25,56 @@ START = "<!-- work-graph:start -->"
 END = "<!-- work-graph:end -->"
 TITLE_LIMIT = 48
 
+LIMIT = 100  # GitHub's page size cap; a list that fills it may be cut off, which --write refuses
 NODE_FIELDS = """
-  number title state
-  blockedBy(first: 20) { nodes { number title state repository { nameWithOwner } } }
-"""
+  number title state repository { nameWithOwner }
+  blockedBy(first: %d) { pageInfo { hasNextPage } nodes { number title state repository { nameWithOwner } } }
+""" % LIMIT
 # Epic, its features and their tasks: the three levels the standard allows.
 EPIC_QUERY = """
 query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     issue(number: $number) {
       body %(fields)s
-      subIssues(first: 50) { nodes { %(fields)s
-        subIssues(first: 50) { nodes { %(fields)s } } } }
+      subIssues(first: %(limit)d) { pageInfo { hasNextPage } nodes { %(fields)s
+        subIssues(first: %(limit)d) { pageInfo { hasNextPage } nodes { %(fields)s } } } }
     }
   }
 }
-""" % {"fields": NODE_FIELDS}
+""" % {"fields": NODE_FIELDS, "limit": LIMIT}
 
 
 def tree(node):
+    """An issue and its sub-issues, keyed by (repo, number): a number alone repeats across repositories."""
+    sub_issues = node.get("subIssues", {})
     return {
-        "number": node["number"],
+        "key": (node["repository"]["nameWithOwner"], node["number"]),
         "title": node["title"],
         "open": node["state"] == "OPEN",
-        "blocked_by": [(b["number"], b["title"], b["state"] == "OPEN")
+        "blocked_by": [((b["repository"]["nameWithOwner"], b["number"]), b["title"], b["state"] == "OPEN")
                        for b in node["blockedBy"]["nodes"]],
-        "children": [tree(child) for child in node.get("subIssues", {}).get("nodes", [])],
+        "children": [tree(child) for child in sub_issues.get("nodes", [])],
+        "cut_off": node["blockedBy"]["pageInfo"]["hasNextPage"]
+                   or sub_issues.get("pageInfo", {}).get("hasNextPage", False),
     }
 
 
-def label(number, title):
+def cut_off(epic):
+    """The issues whose sub-issues or blockers did not fit one page."""
+    return [issue["key"] for issue in [epic, *walk(epic)] if issue["cut_off"]]
+
+
+def node_id(key, home):
+    repo, number = key
+    return f"i{number}" if repo == home else f"i{number}_" + re.sub(r"\W", "_", repo)
+
+
+def label(key, title, home):
+    repo, number = key
     title = title.replace('"', "'")
     if len(title) > TITLE_LIMIT:
         title = title[:TITLE_LIMIT - 1] + "…"
-    return f"#{number} {title}"
+    return f"#{number} {title}" if repo == home else f"{repo}#{number} {title}"
 
 
 def walk(node):
@@ -69,51 +85,60 @@ def walk(node):
 
 def render(epic):
     """The fenced Mermaid block for an epic tree: blocker --> blocked, sub-issues grouped."""
-    members = {issue["number"]: issue for issue in walk(epic)}
+    home = epic["key"][0]
+    members = {issue["key"]: issue for issue in walk(epic)}
     lines = ["flowchart LR"]
 
     def emit(issue, indent):
         pad = "  " * indent
+        text = f'["{label(issue["key"], issue["title"], home)}"]'
         if issue["children"]:
-            lines.append(f'{pad}subgraph i{issue["number"]}["{label(issue["number"], issue["title"])}"]')
+            lines.append(f'{pad}subgraph {node_id(issue["key"], home)}{text}')
             lines.append(f"{pad}  direction TB")
             for child in issue["children"]:
                 emit(child, indent + 1)
             lines.append(f"{pad}end")
         else:
-            lines.append(f'{pad}i{issue["number"]}["{label(issue["number"], issue["title"])}"]')
+            lines.append(f'{pad}{node_id(issue["key"], home)}{text}')
 
     for child in epic["children"]:
         emit(child, 1)
     edges, outside = [], {}
     for issue in members.values():
-        for number, title, is_open in issue["blocked_by"]:
-            edges.append((number, issue["number"]))
-            if number not in members:
-                outside[number] = (title, is_open)
-    for number, (title, _) in sorted(outside.items()):
-        lines.append(f'  i{number}["{label(number, title)}<br>outside this epic"]')
+        for key, title, is_open in issue["blocked_by"]:
+            edges.append((node_id(key, home), node_id(issue["key"], home)))
+            if key not in members:
+                outside[key] = (title, is_open)
+    for key, (title, _) in sorted(outside.items()):
+        lines.append(f'  {node_id(key, home)}["{label(key, title, home)}<br>outside this epic"]')
     for blocker, blocked in sorted(set(edges)):
-        lines.append(f"  i{blocker} --> i{blocked}")
-    closed = [f"i{n}" for n, issue in members.items() if not issue["open"]]
-    closed += [f"i{n}" for n, (_, is_open) in outside.items() if not is_open]
+        lines.append(f"  {blocker} --> {blocked}")
+    closed = [node_id(key, home) for key, issue in members.items() if not issue["open"]]
+    closed += [node_id(key, home) for key, (_, is_open) in outside.items() if not is_open]
     if closed:
         lines.append("  classDef closed fill:#d4edda,stroke:#2e7d32")
         lines.append(f"  class {','.join(sorted(closed))} closed")
     if outside:
         lines.append("  classDef outside stroke-dasharray:5 3")
-        lines.append(f"  class {','.join(f'i{n}' for n in sorted(outside))} outside")
+        lines.append(f"  class {','.join(node_id(key, home) for key in sorted(outside))} outside")
     note = "Arrow: blocker → blocked. Green = closed. Generated by `docs/tools/issue-graph.py`; do not edit."
     return "```mermaid\n" + "\n".join(lines) + "\n```\n\n" + note
 
 
 def splice(body, block):
-    """Put the block between the markers of a body; append the markers when missing."""
+    """Put the block between the markers of a body; append the markers when missing.
+
+    Raises ValueError for any shape other than no marker, or one start before one end:
+    replacing between a stray start and a later end would delete the text in between.
+    """
     section = f"{START}\n{block}\n{END}"
-    pattern = re.compile(re.escape(START) + r".*?" + re.escape(END), re.S)
-    if pattern.search(body):
-        return pattern.sub(lambda _: section, body)
-    return body.rstrip("\n") + "\n\n" + section + "\n"
+    starts, ends = body.count(START), body.count(END)
+    if (starts, ends) == (0, 0):
+        return body.rstrip("\n") + "\n\n" + section + "\n"
+    if (starts, ends) != (1, 1) or body.index(START) > body.index(END):
+        raise ValueError(f"the body has {starts} start and {ends} end markers; it needs none, or one start "
+                         f"before one end. Fix the markers by hand")
+    return body[:body.index(START)] + section + body[body.index(END) + len(END):]
 
 
 def main():
@@ -122,16 +147,27 @@ def main():
     parser.add_argument("--repo", help="<owner>/<name>; default: the current repository")
     parser.add_argument("--write", action="store_true", help="write the graph into the epic's body")
     args = parser.parse_args()
+    tracker.utf8_output()
     repo = args.repo or tracker.default_repo()
     owner, name = repo.split("/")
     node = tracker.gh_graphql(EPIC_QUERY, owner=owner, name=name, number=args.epic)["repository"]["issue"]
     if node is None:
         sys.exit(f"{repo}#{args.epic} not found")
-    block = render(tree(node))
+    root = tree(node)
+    block = render(root)
+    cut = cut_off(root)
+    if cut:
+        print(f"warning: more than {LIMIT} sub-issues or blockers on "
+              + ", ".join(f"{r}#{n}" for r, n in cut) + "; the graph is incomplete", file=sys.stderr)
     if not args.write:
         print(block)
         return 0
-    body = splice(node["body"] or "", block)
+    if cut:
+        sys.exit("refusing --write: the graph is incomplete")
+    try:
+        body = splice(node["body"] or "", block)
+    except ValueError as error:
+        sys.exit(f"{repo}#{args.epic}: {error}")
     if body == (node["body"] or ""):
         print(f"{repo}#{args.epic}: work graph already current")
         return 0

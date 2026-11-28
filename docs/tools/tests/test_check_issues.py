@@ -1,6 +1,6 @@
 import io
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
 
 from loader import load
@@ -11,14 +11,16 @@ EPIC_BODY = "## Acceptance Criteria\n- [ ] done"
 NO_AREA = "has no area label (the feature it touches)"
 
 
-def node(number, *, type=None, labels=("training",), parent=None, body="", state="OPEN", blocked_by=()):
+def node(number, *, type=None, labels=("training",), parent=None, body="", state="OPEN", blocked_by=(),
+         more_labels=False, more_blockers=False):
     return {
         "id": f"I_{number}", "number": number, "title": f"Issue {number}", "state": state, "body": body,
         "repository": {"nameWithOwner": REPO},
         "issueType": {"name": type} if type else None,
-        "labels": {"nodes": [{"name": name} for name in labels]},
+        "labels": {"pageInfo": {"hasNextPage": more_labels}, "nodes": [{"name": name} for name in labels]},
         "parent": {"id": f"I_{parent}"} if parent else None,
-        "blockedBy": {"nodes": [{"number": n, "repository": {"nameWithOwner": REPO}} for n in blocked_by]},
+        "blockedBy": {"pageInfo": {"hasNextPage": more_blockers},
+                      "nodes": [{"number": n, "repository": {"nameWithOwner": REPO}} for n in blocked_by]},
     }
 
 
@@ -48,7 +50,7 @@ class ValidTree(unittest.TestCase):
         ), [])
 
     def test_bug_may_stay_parentless_and_epic_needs_no_area(self):
-        result = messages(node(1, type="Bug"), node(2, type="Epic", labels=(), body="standing epic"))
+        result = messages(node(1, type="Bug"), node(2, type="Epic", labels=(), body="Standing: yes"))
         self.assertEqual(result, [("warning", 2, NO_AREA), ("warning", 2, "is an epic without sub-issues")])
 
 
@@ -75,6 +77,12 @@ class Labels(unittest.TestCase):
     def test_github_default_labels_are_not_areas(self):
         result = messages(node(1, type="Epic", body=EPIC_BODY), node(2, type="Task", parent=1, labels=("enhancement",)))
         self.assertEqual(for_issue(result, 2), [("error", NO_AREA)])
+
+    def test_every_github_default_label_is_not_an_area(self):
+        for name in ("bug", "documentation", "duplicate", "enhancement", "good first issue", "help wanted",
+                     "invalid", "question", "wontfix"):
+            result = messages(node(1, type="Epic", body=EPIC_BODY), node(2, type="Task", parent=1, labels=(name,)))
+            self.assertEqual(for_issue(result, 2), [("error", NO_AREA)], name)
 
     def test_exempt_label_is_not_an_area(self):
         result = messages(node(1, type="Epic", body=EPIC_BODY), node(2, type="Task", parent=1, labels=("SYSTEM",)),
@@ -103,6 +111,22 @@ class Hierarchy(unittest.TestCase):
         self.assertEqual(for_issue(result, 3),
                          [("error", "is a feature under #2, a task; a feature sits under an epic")])
 
+    def test_feature_under_a_feature(self):
+        result = messages(node(1, type="Epic", body=EPIC_BODY), node(2, type="Feature", parent=1, body="Wiki: x"),
+                          node(3, type="Feature", parent=2, body="Wiki: y"))
+        self.assertEqual(for_issue(result, 3),
+                         [("error", "is a feature under #2, a feature; a feature sits under an epic")])
+
+    def test_task_under_a_parentless_bug_belongs_to_no_epic(self):
+        result = messages(node(1, type="Bug"), node(2, type="Task", parent=1))
+        self.assertEqual(result, [("error", 2, "does not belong to an epic: its top is #1, a bug")])
+
+    def test_task_under_a_parentless_feature_names_the_missing_epic_once(self):
+        result = messages(node(1, type="Feature", body="Wiki: x"), node(2, type="Task", parent=1))
+        self.assertEqual([m for _, n, m in result if n == 1], ["has no parent epic (only a bug may stay parentless)"])
+        self.assertEqual([m for _, n, m in result if n == 2],
+                         ["does not belong to an epic: its top is #1, a feature"])
+
     def test_four_levels_deep(self):
         result = messages(node(1, type="Epic", body=EPIC_BODY), node(2, type="Feature", parent=1, body="Wiki: x"),
                           node(3, type="Task", parent=2), node(4, type="Task", parent=3))
@@ -119,7 +143,19 @@ class Epics(unittest.TestCase):
         self.assertEqual(for_issue(result, 1)[0][1][:32], "is an epic without acceptance cr")
 
     def test_standing_epic_needs_no_acceptance_criteria(self):
-        self.assertEqual(messages(node(1, type="Epic", body="A standing epic."), node(2, type="Task", parent=1)), [])
+        for body in ("Standing: yes", "Maintenance.\n- **Standing:** yes\n"):
+            self.assertEqual(messages(node(1, type="Epic", body=body), node(2, type="Task", parent=1)), [], body)
+
+    def test_the_word_standing_inside_other_words_is_not_the_marker(self):
+        for body in ("Improve our understanding of HRV", "Outstanding work on sync", "A standing epic.",
+                     "Standing: no"):
+            result = messages(node(1, type="Epic", body=body), node(2, type="Task", parent=1))
+            self.assertEqual(for_issue(result, 1)[0][1][:32], "is an epic without acceptance cr", body)
+
+    def test_closed_children_do_not_hide_behind_the_word_standing(self):
+        result = messages(node(1, type="Epic", body=EPIC_BODY + "\nOutstanding work"),
+                          node(2, type="Task", parent=1, state="CLOSED"))
+        self.assertEqual(result, [("warning", 1, "has every sub-issue closed; propose closing it to the owner")])
 
     def test_all_children_closed_proposes_closing(self):
         result = messages(node(1, type="Epic", body=EPIC_BODY), node(2, type="Task", parent=1, state="CLOSED"))
@@ -169,14 +205,33 @@ class ProseOrder(unittest.TestCase):
         self.assertEqual(messages(self.epic, node(2, type="Task", parent=1, body=body)), [])
 
 
+class Truncation(unittest.TestCase):
+    def test_labels_or_blockers_that_fill_a_page_warn(self):
+        result = messages(node(1, type="Epic", body=EPIC_BODY),
+                          node(2, type="Task", parent=1, more_labels=True, more_blockers=True))
+        self.assertEqual([m[:22] for _, m in for_issue(result, 2)],
+                         ["has more labels than w", "has more blockers than"])
+
+
 class Run(unittest.TestCase):
-    def run_main(self, pages, argv):
+    def run_main(self, pages, argv, out=None):
         responses = iter(pages)
-        out = io.StringIO()
-        with mock.patch.object(ci.tracker, "gh_graphql", side_effect=lambda *a, **k: next(responses)), \
-                mock.patch("sys.argv", ["check-issues.py", *argv]), redirect_stdout(out):
+        calls = self.calls = []
+
+        def respond(query, **variables):
+            calls.append(variables)
+            response = next(responses)
+            if isinstance(response, BaseException):
+                raise response
+            return response
+
+        out = out or io.StringIO()
+        with mock.patch.object(ci.tracker, "gh_graphql", side_effect=respond), \
+                mock.patch("sys.argv", ["check-issues.py", *argv]), redirect_stdout(out), \
+                redirect_stderr(io.StringIO()) as err:
             code = ci.main()
-        return code, out.getvalue()
+        self.err = err.getvalue()
+        return code, getattr(out, "getvalue", str)()
 
     def page(self, nodes, more=False):
         return {"repository": {"issues": {"pageInfo": {"hasNextPage": more, "endCursor": "c"}, "nodes": nodes}}}
@@ -185,6 +240,7 @@ class Run(unittest.TestCase):
         code, out = self.run_main([self.page([node(1, type="Epic", body=EPIC_BODY)], more=True),
                                    self.page([node(2, type="Task")])], ["--repo", REPO])
         self.assertEqual(code, 1)
+        self.assertEqual([call["cursor"] for call in self.calls], [None, "c"])
         self.assertIn("acme/app#2 has no parent epic", out)
         self.assertIn("2 open issues checked: 1 errors, 1 warnings", out)
 
@@ -195,6 +251,31 @@ class Run(unittest.TestCase):
                                   ["--repo", REPO, "--repo", "acme/other"])
         self.assertEqual(code, 0)
         self.assertIn("2 open issues checked: 0 errors, 0 warnings", out)
+
+    def test_an_unreadable_api_exits_2_not_1(self):
+        code, out = self.run_main([SystemExit("gh api graphql failed: HTTP 502")], ["--repo", REPO])
+        self.assertEqual(code, 2)
+        self.assertIn("HTTP 502", self.err)
+        self.assertEqual(out, "")
+
+    def test_a_repository_that_is_not_found_exits_2(self):
+        code, _ = self.run_main([{"repository": None}], ["--repo", REPO])
+        self.assertEqual(code, 2)
+        self.assertIn("acme/app not found", self.err)
+
+    def test_a_failure_on_a_later_page_exits_2_without_a_report(self):
+        code, out = self.run_main([self.page([node(2, type="Task")], more=True), SystemExit("boom")],
+                                  ["--repo", REPO])
+        self.assertEqual(code, 2)
+        self.assertNotIn("open issues checked", out)
+
+    def test_output_survives_a_cp1252_redirect(self):
+        raw = io.BytesIO()
+        out = io.TextIOWrapper(raw, encoding="cp1252", errors="strict")
+        self.run_main([self.page([node(1, type="Epic", body=EPIC_BODY, labels=("a→b", "c", "d"))])],
+                      ["--repo", REPO], out=out)
+        out.flush()
+        self.assertIn("a→b".encode("utf-8"), raw.getvalue())
 
 
 if __name__ == "__main__":
