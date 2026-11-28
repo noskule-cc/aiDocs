@@ -117,6 +117,9 @@ docs/
 ├── CREATING_AGENTS.md              # How to create and register skills and agents
 └── tools/
     ├── check-docs.py               # Mechanical structural checks (CI + local)
+    ├── check-issues.py             # Issue hierarchy checks (types, labels, parents, epics, prose order)
+    ├── issue-graph.py              # Work graph of an epic (Mermaid, from blocked-by links)
+    ├── tests/                      # Offline tests of the tool scripts (CI)
     ├── code-index/                 # Code analysis tooling (feeds code-analysis agent)
     ├── evals.template.md           # Triage eval cases (run by validation-llm)
     └── jobs.template.md            # Runnable jobs registry

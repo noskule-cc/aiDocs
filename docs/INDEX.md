@@ -55,6 +55,12 @@ Quick navigation to all docs. Read only what you need, when you need it.
 
 - `status` (where are we), `check` (board rules), `roadmap` (Mermaid dependency graph), `set` / `start` / `review` (move an issue)
 
+**tools/check-issues.py** - Issue hierarchy checks (`issue-tracker.md` › Hierarchy) over the GitHub API
+
+- Types (native or `type:` labels), feature labels, parents, epics, order written in prose, a Feature's wiki page; exit 1 on errors
+
+**tools/issue-graph.py** - Work graph of an epic: sub-issues and blocked-by links as Mermaid, written into the epic body
+
 **tools/tracker-in-progress.yml** - GitHub workflow: the first push of `<type>/<N>-<slug>` moves #N to In Progress, its PR to Review
 
 - Copied to `.github/workflows/`; needs the `TRACKER_PROJECT` variable and a `PROJECT_TOKEN` secret
