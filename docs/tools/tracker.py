@@ -1,19 +1,26 @@
 #!/usr/bin/env python3
 """Board state and board hygiene for the Focus board model (issue-tracker.md).
 
-One query of the GitHub Projects v2 board, three views of it:
+Reads the GitHub Projects v2 board, and moves issues on it:
 
-  status   what waits on the owner (by Owner action), what the current Focus
+  status   what waits on a human (by Human action), what the current Focus
            holds, what can be picked up next
-  check    board rules a script can verify; exit 1 on errors
+  check    board rules a script can verify; exit 1 on errors; --fix clears
+           a Human action left on a card dragged out of its column
   roadmap  Mermaid graph of open epics and issues linked by "blocked by"
+  set      move an issue to a column; sets or clears Human action to match
+  start    move an issue to In Progress unless it is already further along
+  review   move an issue to Review unless it is already further along
+           (both run by the tracker-in-progress workflow: branch push, PR opened)
 
 Stdlib only; talks to GitHub through the `gh` CLI (must be logged in).
 
 Usage:
   python docs/tools/tracker.py status  --project <owner>/<number> [--repo <owner>/<name>]
-  python docs/tools/tracker.py check   --project <owner>/<number> [--repo <owner>/<name>]
+  python docs/tools/tracker.py check   --project <owner>/<number> [--repo <owner>/<name>] [--fix]
   python docs/tools/tracker.py roadmap --project <owner>/<number> [--repo <owner>/<name>] [--out FILE]
+  python docs/tools/tracker.py set <issue> <column> [--action <Human action>] --project <owner>/<number> [--repo <owner>/<name>]
+  python docs/tools/tracker.py start|review <issue> --project <owner>/<number> [--repo <owner>/<name>]
 """
 
 import argparse
@@ -22,18 +29,20 @@ import subprocess
 import sys
 
 # Column names of the Status field, in board order (issue-tracker.md).
-STATUSES = ["Backlog", "Refine", "Ready", "In Progress", "Waiting on owner",
+STATUSES = ["Backlog", "Refine", "Ready", "In Progress", "Needs decision",
             "Review", "Test", "Done"]
+NEEDS_DECISION = "Needs decision"
 EPIC_TYPE = "Epic"
 BUG_TYPE = "Bug"
-OWNER_FIELD = "Owner action"
-DECIDE = "Decide"  # the Owner action that pairs with "Waiting on owner"
+HUMAN_FIELD = "Human action"
+DECIDE = "Decide"  # the Human action that pairs with "Needs decision"
+HUMAN_STATUSES = (NEEDS_DECISION, "Test")  # the columns that carry a Human action
 MANUAL_TEST_HEADING = "## manual test"
 
 ITEM_FIELDS = """
   status: fieldValueByName(name: "Status") {
     ... on ProjectV2ItemFieldSingleSelectValue { name } }
-  ownerAction: fieldValueByName(name: "Owner action") {
+  humanAction: fieldValueByName(name: "Human action") {
     ... on ProjectV2ItemFieldSingleSelectValue { name } }
   priority: fieldValueByName(name: "Priority") {
     ... on ProjectV2ItemFieldSingleSelectValue { name } }
@@ -79,7 +88,8 @@ query($owner: String!, $name: String!, $cursor: String) {
 """
 
 
-def gh_graphql(query, **variables):
+def gh_graphql(query, tolerate=None, **variables):
+    """Run a GraphQL query; tolerate: an error text that returns None instead of exiting."""
     cmd = ["gh", "api", "graphql", "-f", f"query={query}"]
     for key, value in variables.items():
         if value is None:
@@ -88,6 +98,8 @@ def gh_graphql(query, **variables):
         cmd += [flag, f"{key}={value}"]
     result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
     if result.returncode != 0:
+        if tolerate and tolerate in result.stderr:
+            return None
         sys.exit(f"gh api graphql failed: {result.stderr.strip()}")
     return json.loads(result.stdout)["data"]
 
@@ -132,7 +144,7 @@ def load_board(project, repo):
                 "url": issue["url"],
                 "open": issue["state"] == "OPEN",
                 "status": single(node.get("status")),
-                "owner_action": single(node.get("ownerAction")),
+                "human_action": single(node.get("humanAction")),
                 "priority": single(node.get("priority")),
                 "type": (issue.get("issueType") or {}).get("name"),
                 "parent": (issue.get("parent") or {}).get("number"),
@@ -186,14 +198,13 @@ def cmd_status(fields, items, milestones, off_board):
         for row in rows:
             print(indent + line(row))
 
-    owed = [i for i in items if i["owner_action"]
-            or i["status"] == "Waiting on owner" or (i["status"] == "Test")]
-    actions = sorted({i["owner_action"] or "no Owner action" for i in owed},
-                     key=lambda a: (a != DECIDE, a == "no Owner action", a))
-    print(f"Waiting for the owner ({len(owed)})")
+    owed = [i for i in items if i["human_action"] or i["status"] in HUMAN_STATUSES]
+    actions = sorted({i["human_action"] or "no Human action" for i in owed},
+                     key=lambda a: (a != DECIDE, a == "no Human action", a))
+    print(f"Waiting for a human ({len(owed)})")
     for action in actions:
         section(action, by_priority([i for i in owed
-                                     if (i["owner_action"] or "no Owner action") == action]), " ")
+                                     if (i["human_action"] or "no Human action") == action]), " ")
 
     open_items = [i for i in items if i["open"] and i["type"] != EPIC_TYPE]
     focus = milestones[0] if len(milestones) == 1 else None
@@ -217,9 +228,10 @@ def cmd_status(fields, items, milestones, off_board):
     return 0
 
 
-def cmd_check(fields, items, milestones, off_board):
+def cmd_check(fields, items, milestones, off_board, fix=None):
+    """fix: (project, repo) to clear Human action left on columns that carry none."""
     errors, warnings = [], []
-    for name in ["Status", "Priority", OWNER_FIELD]:
+    for name in ["Status", "Priority", HUMAN_FIELD]:
         if name not in fields:
             errors.append(f"board has no '{name}' field")
     if len(milestones) > 1:
@@ -229,18 +241,27 @@ def cmd_check(fields, items, milestones, off_board):
         errors.append(f"#{issue['number']} is open but not on the board")
     for i in items:
         ref = f"#{i['number']} ({i['status'] or 'no status'})"
-        action = i["owner_action"]
+        action = i["human_action"]
         if i["status"] == "Test" and action in (None, DECIDE):
-            errors.append(f"{ref} is in Test without a test Owner action")
-        elif i["status"] == "Waiting on owner" and action != DECIDE:
-            errors.append(f"{ref} is Waiting on owner without Owner action {DECIDE}")
-        elif action and i["status"] not in ("Test", "Waiting on owner"):
-            errors.append(f"{ref} still has Owner action {action}; clear it")
+            errors.append(f"{ref} is in Test without a test Human action")
+        elif i["status"] == NEEDS_DECISION and action != DECIDE:
+            errors.append(f"{ref} is {NEEDS_DECISION} without Human action {DECIDE}")
+        elif action and i["status"] not in HUMAN_STATUSES:
+            # A card dragged on the board keeps its Human action.
+            if fix and i["status"] in STATUSES:
+                move(*fix, i["number"], i["status"])
+            else:
+                errors.append(f"{ref} still has Human action {action}; clear it (check --fix)")
         if not i["open"]:
-            if i["status"] not in ("Done", "Test"):
+            if i["status"] == "Test":
+                # Old state: the PR said "Closes #N" while a test was still owed.
+                # Left closed; it clears when the test is done and the item set to Done.
+                warnings.append(f"{ref} is closed with a manual test still owed; "
+                                "new ones stay open (the PR says 'Part of #N')")
+                if not i["has_manual_test"]:
+                    errors.append(f"{ref} is in Test without a '## Manual test' section")
+            elif i["status"] != "Done":
                 errors.append(f"{ref} is closed but not Done")
-            elif i["status"] == "Test" and not i["has_manual_test"]:
-                errors.append(f"{ref} is in Test without a '## Manual test' section")
             continue
         if i["status"] is None:
             errors.append(f"{ref} has no Status")
@@ -303,7 +324,7 @@ def cmd_roadmap(fields, items, milestones, off_board, out=None):
         lines.append(f"  i{blocker} --> i{blocked}")
     for status, style in [("Ready", "stroke:#2e7d32,stroke-width:3px"),
                           ("In Progress", "stroke:#1565c0,stroke-width:3px"),
-                          ("Waiting on owner", "stroke:#f9a825,stroke-width:3px,stroke-dasharray:5 3")]:
+                          (NEEDS_DECISION, "stroke:#f9a825,stroke-width:3px,stroke-dasharray:5 3")]:
         ids = [f"i{n}" for n in shown if open_by_number[n]["status"] == status]
         if ids:
             cls = status.lower().replace(" ", "_")
@@ -311,7 +332,7 @@ def cmd_roadmap(fields, items, milestones, off_board, out=None):
             lines.append(f"  class {','.join(ids)} {cls}")
     text = "```mermaid\n" + "\n".join(lines) + "\n```\n"
     text += ("\nArrow: blocker → blocked. Green = Ready, blue = In Progress, "
-             "yellow dashed = Waiting on owner.\n")
+             f"yellow dashed = {NEEDS_DECISION}.\n")
     if out:
         with open(out, "w", encoding="utf-8") as handle:
             handle.write(text)
@@ -321,18 +342,150 @@ def cmd_roadmap(fields, items, milestones, off_board, out=None):
     return 0
 
 
+FIELDS_QUERY = """
+query($owner: String!, $number: Int!) {
+  %s(login: $owner) {
+    projectV2(number: $number) {
+      id
+      fields(first: 50) { nodes { ... on ProjectV2SingleSelectField { id name options { id name } } } }
+    }
+  }
+}
+"""
+
+ISSUE_ITEM_QUERY = """
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      id
+      projectItems(first: 20) {
+        nodes {
+          id
+          project { id }
+          status: fieldValueByName(name: "Status") {
+            ... on ProjectV2ItemFieldSingleSelectValue { name } }
+          humanAction: fieldValueByName(name: "Human action") {
+            ... on ProjectV2ItemFieldSingleSelectValue { name } }
+        }
+      }
+    }
+  }
+}
+"""
+
+SET_VALUE = """mutation($p: ID!, $i: ID!, $f: ID!, $o: String!) {
+  updateProjectV2ItemFieldValue(input: {projectId: $p, itemId: $i, fieldId: $f,
+    value: {singleSelectOptionId: $o}}) { clientMutationId } }"""
+
+CLEAR_VALUE = """mutation($p: ID!, $i: ID!, $f: ID!) {
+  clearProjectV2ItemFieldValue(input: {projectId: $p, itemId: $i, fieldId: $f}) {
+    clientMutationId } }"""
+
+ADD_ITEM = """mutation($p: ID!, $c: ID!) {
+  addProjectV2ItemById(input: {projectId: $p, contentId: $c}) { item { id } } }"""
+
+
+def option_id(field, name):
+    for option in field["options"]:
+        if option["name"] == name:
+            return option["id"]
+    sys.exit(f"'{field['name']}' has no option '{name}'; options: "
+             + ", ".join(o["name"] for o in field["options"]))
+
+
+def human_action_for(status, requested, current, options):
+    """The Human action a column requires: Decide, a test kind, or none."""
+    if status == NEEDS_DECISION:
+        if requested not in (None, DECIDE):
+            sys.exit(f"{NEEDS_DECISION} goes with Human action {DECIDE}")
+        return DECIDE
+    if status == "Test":
+        action = requested or (current if current != DECIDE else None)
+        if action in (None, DECIDE):
+            sys.exit("Test needs --action naming the kind of test: "
+                     + ", ".join(o for o in options if o != DECIDE))
+        return action
+    if requested:
+        sys.exit(f"Human action is only set in {' and '.join(HUMAN_STATUSES)}")
+    return None
+
+
+def move(project, repo, number, status, requested=None, only_from=None):
+    """Set Status and the matching Human action of one issue; add it to the board if missing.
+
+    only_from: leave the issue alone unless its current Status is one of these.
+    """
+    if status not in STATUSES:
+        sys.exit(f"'{status}' is not a column; columns: " + ", ".join(STATUSES))
+    owner, project_number = project.split("/")
+    kind = owner_kind(owner)
+    board = gh_graphql(FIELDS_QUERY % kind, owner=owner, number=int(project_number))[kind]["projectV2"]
+    fields = {f["name"]: f for f in board["fields"]["nodes"] if f}
+    for name in ("Status", HUMAN_FIELD):
+        if name not in fields:
+            sys.exit(f"board has no single-select field '{name}'")
+    repo_owner, repo_name = repo.split("/")
+
+    def board_item():
+        issue = gh_graphql(ISSUE_ITEM_QUERY, owner=repo_owner, name=repo_name,
+                           number=number)["repository"]["issue"]
+        return issue, next((i for i in issue["projectItems"]["nodes"]
+                            if i["project"]["id"] == board["id"]), None)
+
+    issue, item = board_item()
+    current = single(item.get("status")) if item else None
+    current_action = single(item.get("humanAction")) if item else None
+    if only_from is not None and current not in only_from:
+        print(f"#{number} stays {current}")
+        return 0
+    action = human_action_for(status, requested, current_action,
+                              [o["name"] for o in fields[HUMAN_FIELD]["options"]])
+    if item is None:
+        # A project workflow (auto-add) may add the issue at the same moment.
+        added = gh_graphql(ADD_ITEM, tolerate="already exists", p=board["id"], c=issue["id"])
+        item = added["addProjectV2ItemById"]["item"] if added else board_item()[1]
+        if item is None:
+            sys.exit(f"#{number} was just added to the board by another workflow; run again")
+    gh_graphql(SET_VALUE, p=board["id"], i=item["id"], f=fields["Status"]["id"],
+               o=option_id(fields["Status"], status))
+    if action:
+        gh_graphql(SET_VALUE, p=board["id"], i=item["id"], f=fields[HUMAN_FIELD]["id"],
+                   o=option_id(fields[HUMAN_FIELD], action))
+    elif current_action:
+        gh_graphql(CLEAR_VALUE, p=board["id"], i=item["id"], f=fields[HUMAN_FIELD]["id"])
+    print(f"#{number} {current or 'off the board'} -> {status}" + (f" ({action})" if action else ""))
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("command", choices=["status", "check", "roadmap"])
+    parser.add_argument("command", choices=["status", "check", "roadmap", "set", "start", "review"])
+    parser.add_argument("issue", nargs="?", type=int, help="set/start/review: the issue number")
+    parser.add_argument("column", nargs="?", help="set: the Status column")
+    parser.add_argument("--action", help=f"set: the {HUMAN_FIELD} for Test or {NEEDS_DECISION}")
     parser.add_argument("--project", required=True, help="<owner>/<project number>")
     parser.add_argument("--repo", help="<owner>/<name>; default: the current repository")
     parser.add_argument("--out", help="roadmap: write the Mermaid block to this file")
+    parser.add_argument("--fix", action="store_true",
+                        help="check: clear Human action left on a column that carries none")
     args = parser.parse_args()
-    board = load_board(args.project, args.repo or default_repo())
+    repo = args.repo or default_repo()
+    if args.command in ("set", "start", "review"):
+        if args.issue is None or (args.command == "set") != bool(args.column):
+            parser.error("usage: set <issue> <column> | start <issue> | review <issue>")
+        # Forward moves only: an issue already further along stays where it is.
+        before_work = (None, "Backlog", "Refine", "Ready")
+        if args.command == "start":
+            return move(args.project, repo, args.issue, "In Progress", only_from=before_work)
+        if args.command == "review":
+            return move(args.project, repo, args.issue, "Review",
+                        only_from=before_work + ("In Progress",))
+        return move(args.project, repo, args.issue, args.column, requested=args.action)
+    board = load_board(args.project, repo)
     if args.command == "status":
         return cmd_status(*board)
     if args.command == "check":
-        return cmd_check(*board)
+        return cmd_check(*board, fix=(args.project, repo) if args.fix else None)
     return cmd_roadmap(*board, out=args.out)
 
 
